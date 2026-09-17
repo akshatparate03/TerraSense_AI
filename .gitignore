@@ -1,0 +1,11 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.env
+backend/.env
+frontend/.env
+frontend/GUIDE.md
+frontend/RUNGUIDE.md
+backend/data/app.db
+.DS_Store

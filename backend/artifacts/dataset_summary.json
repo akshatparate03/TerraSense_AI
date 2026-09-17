@@ -1,0 +1,79 @@
+{
+  "raw_rows": 11033,
+  "raw_columns": 31,
+  "clean_rows": 11033,
+  "duplicates_removed": 0,
+  "training_rows_total": 22066,
+  "training_rows_positive": 11033,
+  "training_rows_negative": 11033,
+  "missing_value_fraction_top_columns": {
+    "event_time": 1.0,
+    "notes": 0.9713,
+    "storm_name": 0.9477,
+    "photo_link": 0.8644,
+    "injury_count": 0.5143,
+    "admin_division_name": 0.1484,
+    "country_code": 0.1418,
+    "event_import_source": 0.1417,
+    "gazeteer_closest_point": 0.1417,
+    "country_name": 0.1416,
+    "event_import_id": 0.1416,
+    "admin_division_population": 0.1416,
+    "gazeteer_distance": 0.1416,
+    "fatality_count": 0.1255,
+    "event_description": 0.0781
+  },
+  "landslide_size_distribution": {
+    "medium": 6551,
+    "small": 2767,
+    "unknown": 860,
+    "large": 750,
+    "very_large": 102,
+    "catastrophic": 3
+  },
+  "landslide_trigger_rain_fraction": 0.8084836399891235,
+  "top_countries": {
+    "United States": 2992,
+    "unknown": 1562,
+    "India": 1265,
+    "Philippines": 675,
+    "Nepal": 481,
+    "China": 426,
+    "Indonesia": 355,
+    "United Kingdom": 229,
+    "Brazil": 214,
+    "Canada": 174
+  },
+  "feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km",
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ],
+  "real_feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km"
+  ],
+  "simulated_feature_columns": [
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ]
+}

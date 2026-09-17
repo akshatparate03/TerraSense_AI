@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://terrasenseai.netlify.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/monitoring</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/predict</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/analytics</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/historical</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/model</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/map</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/alerts</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/login</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://terrasenseai.netlify.app/register</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+</urlset>

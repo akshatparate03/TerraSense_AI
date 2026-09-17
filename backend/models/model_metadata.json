@@ -1,0 +1,58 @@
+{
+  "selected_model": "XGBoost",
+  "metrics": {
+    "accuracy": 0.9000906207521523,
+    "precision": 0.9208770257387988,
+    "recall": 0.8753964657906661,
+    "f1_score": 0.8975609756097561,
+    "roc_auc": 0.9695030578858018,
+    "cv_f1_mean": 0.8991226295838912,
+    "cv_f1_std": 0.005452507826713204
+  },
+  "feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km",
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ],
+  "real_feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km"
+  ],
+  "simulated_feature_columns": [
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ],
+  "training_samples": 17652,
+  "testing_samples": 4414,
+  "dataset_version": "global_landslide_catalog_v1+pseudo_absence_v1",
+  "trained_at_unix": 1789416889.2401052,
+  "trained_at_iso": "2026-09-14T20:14:49.240160+00:00",
+  "all_candidates_evaluated": [
+    "Logistic Regression",
+    "Decision Tree",
+    "Random Forest",
+    "Gradient Boosting",
+    "XGBoost"
+  ],
+  "sklearn_random_state": 42,
+  "training_duration_seconds": 70.86
+}

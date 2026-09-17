@@ -1,0 +1,15 @@
+{
+  "rainfall_mm": 0.4553700089454651,
+  "soil_moisture_pct": 0.153779998421669,
+  "slope_deg": 0.06345999985933304,
+  "trigger_is_rain": 0.06241999939084053,
+  "trigger_is_other": 0.041930001229047775,
+  "location_accuracy_km": 0.03759999945759773,
+  "longitude": 0.03663000091910362,
+  "latitude": 0.030710000544786453,
+  "elevation_m": 0.025520000606775284,
+  "humidity_pct": 0.024779999628663063,
+  "month": 0.023469999432563782,
+  "trigger_is_seismic": 0.02312999963760376,
+  "temperature_c": 0.021199999377131462
+}

@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-base-950 text-slate-200 antialiased;
+  background-image: radial-gradient(
+    ellipse 80% 50% at 50% -10%,
+    rgba(34, 211, 238, 0.1),
+    transparent 60%
+  );
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1b2333;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #26314a;
+}
+
+.glass {
+  background: linear-gradient(
+    180deg,
+    rgba(19, 25, 36, 0.7),
+    rgba(13, 17, 23, 0.7)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.leaflet-container {
+  background: #0a0e14 !important;
+}
+
+/* ---------------------------------------------------------------------
+   Premium animated background elements (orbs, grid, particle canvas)
+--------------------------------------------------------------------- */
+.bg-grid-lines {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px);
+  background-size: 42px 42px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 30%,
+    black 40%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 30%,
+    black 40%,
+    transparent 100%
+  );
+}
+
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.orb-cyan {
+  width: 32rem;
+  height: 32rem;
+  top: -8rem;
+  left: -6rem;
+  background: radial-gradient(circle at 30% 30%, #22d3ee, transparent 70%);
+  animation: orbFloatA 22s ease-in-out infinite;
+}
+.orb-blue {
+  width: 28rem;
+  height: 28rem;
+  bottom: -10rem;
+  right: -8rem;
+  background: radial-gradient(circle at 60% 60%, #3b82f6, transparent 70%);
+  animation: orbFloatB 26s ease-in-out infinite;
+}
+.orb-emerald {
+  width: 22rem;
+  height: 22rem;
+  top: 40%;
+  left: 55%;
+  background: radial-gradient(circle at 50% 50%, #34d399, transparent 70%);
+  animation: orbFloatC 30s ease-in-out infinite;
+}
+@keyframes orbFloatA {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6rem, 4rem) scale(1.15);
+  }
+}
+@keyframes orbFloatB {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-5rem, -3rem) scale(1.1);
+  }
+}
+@keyframes orbFloatC {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-4rem, 5rem) scale(1.2);
+  }
+}
+
+html.light .orb {
+  opacity: 0.28;
+}
+html.light .bg-grid-lines {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, #22d3ee, #3b82f6 60%, #34d399);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3.2s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes floatSlow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+/* Remove the default browser up/down spinner arrows on number inputs --
+   they clash with the app's custom dark input styling everywhere
+   (e.g. the Risk Prediction form). */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
