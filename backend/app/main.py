@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import alerts, analytics_api, landslide_events, locations, models_api, predictions
+from app.api import alerts, analytics_api, health, landslide_events, locations, models_api, predictions
 from app.api.auth import router as auth_router
 from app.core.config import settings
 from app.core.database import get_db
@@ -45,6 +43,7 @@ except Exception:
 
 # Routers
 app.include_router(auth_router)
+app.include_router(health.router)
 app.include_router(predictions.router)
 app.include_router(locations.router)
 app.include_router(alerts.router)
@@ -54,30 +53,10 @@ app.include_router(analytics_api.router)
 
 
 # ---------------------------------------------------------------------------
-# Health & branding
-# ---------------------------------------------------------------------------
-@app.get("/api/health")
-async def health(db: Session = Depends(get_db)):
-    db_ok = True
-    db_error = None
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception as e:  # pragma: no cover
-        db_ok = False
-        db_error = "database unavailable"
-        logger.error(f"DB health check failed: {e}")
-
-    return {
-        "status": "ok" if db_ok else "degraded",
-        "app_name": settings.APP_NAME,
-        "tagline": settings.APP_TAGLINE,
-        "model_ready": inference_service.is_ready,
-        "database_ready": db_ok,
-        "database_error": db_error,
-        "time": datetime.now(timezone.utc).isoformat(),
-    }
-
-
+# Health & branding are handled by app/api/health.py (registered above as
+# health.router) -- JSON at /api/health/status, styled status page at
+# /api/health (good uptime-pinger target for keeping a free Render instance
+# awake).
 # ---------------------------------------------------------------------------
 # Model info / metrics (from trained artifacts - kept for the ML Model page's
 # confusion matrix / ROC / feature-importance visuals; DB-backed version-

@@ -79,12 +79,19 @@ VALID_PREDICT_PAYLOAD = {
 # Health / DB connectivity
 # ---------------------------------------------------------------------------
 def test_health_and_db_connection(client):
-    r = client.get("/api/health")
+    # /api/health now serves the styled HTML status page (used as the Render
+    # keep-alive ping target); the machine-readable check moved to
+    # /api/health/status.
+    r = client.get("/api/health/status")
     assert r.status_code == 200
     body = r.json()
-    assert body["status"] == "ok"
-    assert body["database_ready"] is True
-    assert body["app_name"] == "TerraSense AI"
+    assert body["status"] == "UP"
+    assert body["database"] == "UP"
+    assert body["backend"] == "UP"
+
+    page = client.get("/api/health")
+    assert page.status_code == 200
+    assert "TerraSense AI" in page.text
 
 
 # ---------------------------------------------------------------------------
