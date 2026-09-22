@@ -1,4 +1,5 @@
 {
+  "model_version": "v1_legacy",
   "selected_model": "XGBoost",
   "metrics": {
     "accuracy": 0.9000906207521523,
@@ -41,11 +42,12 @@
     "temperature_c",
     "humidity_pct"
   ],
+  "geo_feature_columns": [],
   "training_samples": 17652,
   "testing_samples": 4414,
   "dataset_version": "global_landslide_catalog_v1+pseudo_absence_v1",
-  "trained_at_unix": 1789416889.2401052,
-  "trained_at_iso": "2026-09-14T20:14:49.240160+00:00",
+  "trained_at_unix": 1790103804.3179767,
+  "trained_at_iso": "2026-09-22T19:03:24.317976+00:00",
   "all_candidates_evaluated": [
     "Logistic Regression",
     "Decision Tree",
@@ -54,5 +56,5 @@
     "XGBoost"
   ],
   "sklearn_random_state": 42,
-  "training_duration_seconds": 70.86
+  "training_duration_seconds": 71.57
 }

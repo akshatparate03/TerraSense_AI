@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
-import { Card, SectionTitle, LoadingSkeleton } from "../components/ui.jsx";
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
+import { Card, LoadingSkeleton } from "../components/ui.jsx";
 import Seo from "../components/Seo.jsx";
+import LocationSearch from "../components/LocationSearch.jsx";
+import { DARK_TILE_URL, DARK_TILE_LABELS_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM } from "../utils/mapTiles.js";
 import { getDatasetLocations } from "../services/api.js";
 import { humanize } from "../utils/format.js";
 
@@ -14,8 +16,18 @@ const SIZE_COLOR = {
   unknown: "#64748b",
 };
 
+function FlyToSearchResult({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo(target, 10, { duration: 0.8 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target?.[0], target?.[1]]);
+  return null;
+}
+
 export default function MapView() {
   const [locations, setLocations] = useState(null);
+  const [searchTarget, setSearchTarget] = useState(null);
 
   useEffect(() => {
     getDatasetLocations(300).then((d) => setLocations(d.locations));
@@ -32,6 +44,8 @@ export default function MapView() {
         </p>
       </div>
 
+      <LocationSearch onSelect={(lat, lon) => setSearchTarget([lat, lon])} placeholder="Jump to a place on the map..." />
+
       <Card hover={false} className="p-0 overflow-hidden">
         {!locations ? (
           <LoadingSkeleton className="h-[560px]" />
@@ -42,31 +56,34 @@ export default function MapView() {
             style={{ height: "560px", width: "100%" }}
             className="rounded-2xl"
           >
-            <TileLayer
-              attribution="&copy; OpenStreetMap contributors, &copy; CARTO"
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            />
-            {locations.map((loc) => (
-              <CircleMarker
-                key={loc.id}
-                center={[loc.latitude, loc.longitude]}
-                radius={5}
-                pathOptions={{
-                  color: SIZE_COLOR[loc.size] || "#64748b",
-                  fillColor: SIZE_COLOR[loc.size] || "#64748b",
-                  fillOpacity: 0.7,
-                }}
-              >
-                <Popup>
-                  <div className="text-xs">
-                    <p className="font-semibold">{loc.name}</p>
-                    <p>{loc.country}</p>
-                    <p>Category: {humanize(loc.category)}</p>
-                    <p>Size: {humanize(loc.size)}</p>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            ))}
+            <TileLayer attribution={TILE_ATTRIBUTION} url={DARK_TILE_URL} maxZoom={TILE_MAX_ZOOM} />
+            <TileLayer url={DARK_TILE_LABELS_URL} maxZoom={TILE_MAX_ZOOM} />
+            <FlyToSearchResult target={searchTarget} />
+            {locations.map((loc) => {
+              const color = SIZE_COLOR[loc.size] || "#64748b";
+              return (
+                <CircleMarker
+                  key={loc.id}
+                  center={[loc.latitude, loc.longitude]}
+                  radius={6}
+                  pathOptions={{
+                    color,
+                    fillColor: color,
+                    fillOpacity: 0.75,
+                    className: "risk-blink-svg",
+                  }}
+                >
+                  <Popup>
+                    <div className="text-xs">
+                      <p className="font-semibold">{loc.name}</p>
+                      <p>{loc.country}</p>
+                      <p>Category: {humanize(loc.category)}</p>
+                      <p>Size: {humanize(loc.size)}</p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              );
+            })}
           </MapContainer>
         )}
       </Card>

@@ -1,0 +1,69 @@
+{
+  "training_rows_total": 28700,
+  "training_rows_positive": 14350,
+  "training_rows_negative": 14350,
+  "feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km",
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct",
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count"
+  ],
+  "real_feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km"
+  ],
+  "simulated_feature_columns": [
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ],
+  "geo_feature_columns": [
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count"
+  ],
+  "feature_source_breakdown": {
+    "MOCK": 28700
+  },
+  "india_specific_rows": 9123,
+  "top_countries": {
+    "India": 9123,
+    "United States": 6078,
+    "unknown": 3116,
+    "Philippines": 1346,
+    "Nepal": 943,
+    "China": 897,
+    "Indonesia": 686,
+    "United Kingdom": 449,
+    "Brazil": 392,
+    "Malaysia": 350
+  }
+}

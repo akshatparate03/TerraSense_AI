@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.db_models import (
     Alert,
+    AlertSubscription,
+    EmailAlertLog,
     EnvironmentalReading,
+    GeoFeatureCache,
     LandslideEvent,
     Location,
     ModelRun,
     Prediction,
 )
+from app.core.config import settings
 
 ALERT_MESSAGES = {
     "HIGH": "Landslide probability exceeded the HIGH risk threshold. Avoid steep-slope areas and notify local authorities.",
@@ -87,6 +91,150 @@ def get_or_create_location_by_coords(db: Session, name: str, lat: float, lon: fl
     db.commit()
     db.refresh(loc)
     return loc
+
+
+# ---------------------------------------------------------------------------
+# Geo feature cache (spec section 16)
+# ---------------------------------------------------------------------------
+def _round_coord(value: float) -> float:
+    return round(value, settings.GEO_CACHE_COORD_PRECISION)
+
+
+def get_geo_cache(db: Session, lat: float, lon: float, radius_km: float, source: str) -> GeoFeatureCache | None:
+    lat_r, lon_r = _round_coord(lat), _round_coord(lon)
+    now = datetime.now(timezone.utc)
+    return (
+        db.query(GeoFeatureCache)
+        .filter(
+            GeoFeatureCache.latitude_rounded == lat_r,
+            GeoFeatureCache.longitude_rounded == lon_r,
+            GeoFeatureCache.radius_km == radius_km,
+            GeoFeatureCache.source == source,
+            GeoFeatureCache.data_status == "LIVE",
+            GeoFeatureCache.expires_at > now,
+        )
+        .order_by(GeoFeatureCache.fetched_at.desc())
+        .first()
+    )
+
+
+def upsert_geo_cache(
+    db: Session, lat: float, lon: float, radius_km: float, source: str, payload: dict, ttl_minutes: int, status: str
+) -> GeoFeatureCache:
+    lat_r, lon_r = _round_coord(lat), _round_coord(lon)
+    now = datetime.now(timezone.utc)
+    entry = GeoFeatureCache(
+        latitude_rounded=lat_r,
+        longitude_rounded=lon_r,
+        radius_km=radius_km,
+        source=source,
+        payload_json=json.dumps(payload),
+        data_status=status,
+        fetched_at=now,
+        expires_at=now + timedelta(minutes=ttl_minutes),
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+# ---------------------------------------------------------------------------
+# Alert subscriptions (email monitoring -- spec sections 37-43)
+# ---------------------------------------------------------------------------
+def create_or_update_subscription(
+    db: Session,
+    user_id: int,
+    label: str,
+    email: str,
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+    alert_threshold: float | None = None,
+    reset_threshold: float | None = None,
+    cooldown_minutes: int | None = None,
+    subscription_id: int | None = None,
+) -> AlertSubscription:
+    alert_threshold = alert_threshold if alert_threshold is not None else settings.DEFAULT_ALERT_THRESHOLD
+    reset_threshold = reset_threshold if reset_threshold is not None else settings.DEFAULT_RESET_THRESHOLD
+    if reset_threshold >= alert_threshold:
+        reset_threshold = max(0.0, alert_threshold - 0.15)
+    cooldown_minutes = cooldown_minutes if cooldown_minutes is not None else settings.DEFAULT_ALERT_COOLDOWN_MINUTES
+
+    if subscription_id:
+        sub = db.query(AlertSubscription).filter(
+            AlertSubscription.id == subscription_id, AlertSubscription.user_id == user_id
+        ).first()
+        if not sub:
+            return None
+    else:
+        sub = AlertSubscription(user_id=user_id)
+        db.add(sub)
+
+    sub.label = label
+    sub.email = email
+    sub.latitude = latitude
+    sub.longitude = longitude
+    sub.radius_km = radius_km
+    sub.alert_threshold = alert_threshold
+    sub.reset_threshold = reset_threshold
+    sub.cooldown_minutes = cooldown_minutes
+    sub.is_active = True
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+def list_subscriptions_for_user(db: Session, user_id: int) -> list[AlertSubscription]:
+    return db.query(AlertSubscription).filter(AlertSubscription.user_id == user_id).order_by(AlertSubscription.created_at.desc()).all()
+
+
+def get_subscription_for_user(db: Session, subscription_id: int, user_id: int) -> AlertSubscription | None:
+    return db.query(AlertSubscription).filter(
+        AlertSubscription.id == subscription_id, AlertSubscription.user_id == user_id
+    ).first()
+
+
+def set_subscription_active(db: Session, subscription_id: int, user_id: int, is_active: bool) -> AlertSubscription | None:
+    sub = get_subscription_for_user(db, subscription_id, user_id)
+    if not sub:
+        return None
+    sub.is_active = is_active
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+def list_all_active_subscriptions(db: Session) -> list[AlertSubscription]:
+    return db.query(AlertSubscription).filter(AlertSubscription.is_active.is_(True)).all()
+
+
+def record_email_alert(
+    db: Session, subscription: AlertSubscription, probability: float, risk_level: str, delivery_status: str
+) -> EmailAlertLog:
+    log = EmailAlertLog(
+        subscription_id=subscription.id,
+        email=subscription.email,
+        probability=probability,
+        risk_level=risk_level,
+        threshold_at_send=subscription.alert_threshold,
+        delivery_status=delivery_status,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+def list_email_alert_history(db: Session, user_id: int, limit: int = 100) -> list[EmailAlertLog]:
+    return (
+        db.query(EmailAlertLog)
+        .join(AlertSubscription, EmailAlertLog.subscription_id == AlertSubscription.id)
+        .filter(AlertSubscription.user_id == user_id)
+        .order_by(EmailAlertLog.sent_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +339,15 @@ def get_prediction(db: Session, prediction_id: int) -> Prediction | None:
 
 def get_latest_predictions(db: Session, limit: int = 10):
     return db.query(Prediction).order_by(Prediction.timestamp.desc()).limit(limit).all()
+
+
+def get_latest_prediction_for_location(db: Session, location_id: int) -> Prediction | None:
+    return (
+        db.query(Prediction)
+        .filter(Prediction.location_id == location_id)
+        .order_by(Prediction.timestamp.desc())
+        .first()
+    )
 
 
 def get_high_risk_predictions(db: Session, limit: int = 50):

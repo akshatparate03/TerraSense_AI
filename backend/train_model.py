@@ -23,6 +23,7 @@ Produces:
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -58,6 +59,8 @@ from sklearn.tree import DecisionTreeClassifier
 sys.path.insert(0, str(Path(__file__).parent))
 from app.ml.data_pipeline import (  # noqa: E402
     ALL_FEATURE_COLS,
+    ALL_FEATURE_COLS_V2,
+    GEO_FEATURE_COLS,
     REAL_FEATURE_COLS,
     SIMULATED_FEATURE_COLS,
     TARGET_COL,
@@ -201,6 +204,31 @@ def get_feature_importance(model: Pipeline, feature_names: list[str]) -> dict:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Train the TerraSense landslide risk model")
+    parser.add_argument(
+        "--dataset",
+        choices=["legacy", "master"],
+        default="legacy",
+        help="'legacy' (default): original NASA-GLC-only + simulated-features pipeline, unchanged. "
+        "'master': train on data/master/terrasense_master_dataset.parquet (built via "
+        "scripts/build_master_dataset.py) with the expanded geo/soil/construction feature set.",
+    )
+    parser.add_argument(
+        "--promote",
+        action="store_true",
+        help="With --dataset master: overwrite the ACTIVE model (models/landslide_pipeline.joblib) "
+        "that the running API serves. Without this flag, a master-trained model is saved only under "
+        "models/versions/<version>/ and registered in models/model_registry.json, without touching "
+        "the currently active model (spec section 51 -- never silently overwrite).",
+    )
+    args = parser.parse_args()
+
+    if args.dataset == "master":
+        return train_on_master_dataset(promote=args.promote)
+    return train_on_legacy_catalog()
+
+
+def train_on_legacy_catalog():
     t0 = time.time()
     print("[1/8] Loading raw Global Landslide Catalog...")
     raw_df = load_raw_catalog(str(DATA_PATH))
@@ -217,13 +245,109 @@ def main():
     with open(ARTIFACTS_DIR / "dataset_summary.json", "w") as f:
         json.dump(eda_summary, f, indent=2, default=str)
 
-    X = dataset[ALL_FEATURE_COLS]
+    _train_evaluate_and_save(
+        dataset,
+        feature_cols=ALL_FEATURE_COLS,
+        dataset_version="global_landslide_catalog_v1+pseudo_absence_v1",
+        model_path=MODELS_DIR / "landslide_pipeline.joblib",
+        metadata_path=MODELS_DIR / "model_metadata.json",
+        t0=t0,
+        version_tag="v1_legacy",
+    )
+
+
+def train_on_master_dataset(promote: bool):
+    t0 = time.time()
+    master_path = BASE_DIR / "data" / "master" / "terrasense_master_dataset.parquet"
+    if not master_path.exists():
+        print(
+            f"ERROR: {master_path} not found. Run `python scripts/build_master_dataset.py` first "
+            "(add --mode live for real environmental features, or --mode mock for an offline demo run)."
+        )
+        sys.exit(1)
+
+    print(f"[1/6] Loading master dataset from {master_path}...")
+    dataset = pd.read_parquet(master_path)
+    dataset = dataset.dropna(subset=ALL_FEATURE_COLS_V2 + [TARGET_COL])
+    print(f"    {len(dataset)} rows, feature_source breakdown: {dataset['feature_source'].value_counts().to_dict() if 'feature_source' in dataset else 'n/a'}")
+
+    print("[2/6] Running EDA / dataset summary...")
+    eda_summary = {
+        "training_rows_total": int(len(dataset)),
+        "training_rows_positive": int((dataset[TARGET_COL] == 1).sum()),
+        "training_rows_negative": int((dataset[TARGET_COL] == 0).sum()),
+        "feature_columns": ALL_FEATURE_COLS_V2,
+        "real_feature_columns": REAL_FEATURE_COLS,
+        "simulated_feature_columns": SIMULATED_FEATURE_COLS,
+        "geo_feature_columns": GEO_FEATURE_COLS,
+        "feature_source_breakdown": dataset["feature_source"].value_counts().to_dict() if "feature_source" in dataset else {},
+        "india_specific_rows": int((dataset.get("country_name") == "India").sum()) if "country_name" in dataset else None,
+        "top_countries": dataset["country_name"].value_counts().head(10).to_dict() if "country_name" in dataset else {},
+    }
+    with open(ARTIFACTS_DIR / "dataset_summary_master.json", "w") as f:
+        json.dump(eda_summary, f, indent=2, default=str)
+
+    version_tag = f"v2_master_{pd.Timestamp.now('UTC').strftime('%Y%m%d_%H%M%S')}"
+    version_dir = MODELS_DIR / "versions" / version_tag
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    metrics = _train_evaluate_and_save(
+        dataset,
+        feature_cols=ALL_FEATURE_COLS_V2,
+        dataset_version=f"terrasense_master_dataset ({dataset.get('feature_source', pd.Series(['unknown'])).mode()[0] if 'feature_source' in dataset else 'unknown'} features)",
+        model_path=version_dir / "landslide_pipeline.joblib",
+        metadata_path=version_dir / "model_metadata.json",
+        t0=t0,
+        version_tag=version_tag,
+        artifacts_suffix="_master",
+    )
+
+    registry_path = MODELS_DIR / "model_registry.json"
+    registry = json.loads(registry_path.read_text()) if registry_path.exists() else {"versions": []}
+    registry["versions"].append(
+        {
+            "version": version_tag,
+            "dataset": "master",
+            "trained_at": pd.Timestamp.now("UTC").isoformat(),
+            "metrics": metrics,
+            "path": str(version_dir),
+            "promoted_to_active": promote,
+        }
+    )
+    with open(registry_path, "w") as f:
+        json.dump(registry, f, indent=2, default=str)
+
+    if promote:
+        print(f"[PROMOTE] Copying {version_tag} to the active model path (models/landslide_pipeline.joblib)...")
+        import shutil
+
+        shutil.copy(version_dir / "landslide_pipeline.joblib", MODELS_DIR / "landslide_pipeline.joblib")
+        shutil.copy(version_dir / "model_metadata.json", MODELS_DIR / "model_metadata.json")
+        print("    Active model updated. Restart the API (or it will pick this up on next load) to serve it.")
+    else:
+        print(
+            f"    Model version {version_tag} saved but NOT promoted -- the currently active model is unchanged. "
+            "Re-run with --promote to make this the model the API serves."
+        )
+
+
+def _train_evaluate_and_save(
+    dataset: pd.DataFrame,
+    feature_cols: list[str],
+    dataset_version: str,
+    model_path: Path,
+    metadata_path: Path,
+    t0: float,
+    version_tag: str,
+    artifacts_suffix: str = "",
+) -> dict:
+    X = dataset[feature_cols]
     y = dataset[TARGET_COL]
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
     )
 
-    print("[5/8] Training candidate models...")
+    print(f"[training] Training candidate models on {len(feature_cols)} features...")
     candidates = build_candidates()
     comparison = {}
     fitted = {}
@@ -237,16 +361,14 @@ def main():
         fitted[name] = pipe
         print(f"    {name}: acc={metrics['accuracy']:.3f} f1={metrics['f1_score']:.3f} auc={metrics['roc_auc']:.3f}")
 
-    with open(ARTIFACTS_DIR / "model_comparison.json", "w") as f:
+    with open(ARTIFACTS_DIR / f"model_comparison{artifacts_suffix}.json", "w") as f:
         json.dump(comparison, f, indent=2)
 
-    print("[6/8] Selecting best model by ROC-AUC...")
     best_name = max(comparison, key=lambda n: comparison[n]["roc_auc"])
     best_model = fitted[best_name]
     best_metrics = comparison[best_name]
     print(f"    Selected: {best_name} (roc_auc={best_metrics['roc_auc']:.4f})")
 
-    print("[7/8] Generating evaluation plots + feature importance...")
     y_proba = best_model.predict_proba(X_test)[:, 1]
     y_pred = best_model.predict(X_test)
 
@@ -254,45 +376,34 @@ def main():
     ConfusionMatrixDisplay.from_estimator(best_model, X_test, y_test, ax=ax, cmap="Blues")
     ax.set_title(f"Confusion Matrix - {best_name}")
     fig.tight_layout()
-    fig.savefig(ARTIFACTS_DIR / "confusion_matrix.png", dpi=140)
+    fig.savefig(ARTIFACTS_DIR / f"confusion_matrix{artifacts_suffix}.png", dpi=140)
     plt.close(fig)
 
-    # Raw confusion matrix counts as JSON, for an interactive hoverable
-    # heatmap in the frontend (no static image needed there).
     cm = confusion_matrix(y_test, y_pred)
-    with open(ARTIFACTS_DIR / "confusion_matrix.json", "w") as f:
+    with open(ARTIFACTS_DIR / f"confusion_matrix{artifacts_suffix}.json", "w") as f:
         json.dump(
             {
                 "model": best_name,
                 "labels": ["No Landslide (0)", "Landslide (1)"],
                 "matrix": cm.tolist(),
-                "tn": int(cm[0][0]),
-                "fp": int(cm[0][1]),
-                "fn": int(cm[1][0]),
-                "tp": int(cm[1][1]),
+                "tn": int(cm[0][0]), "fp": int(cm[0][1]), "fn": int(cm[1][0]), "tp": int(cm[1][1]),
             },
-            f,
-            indent=2,
+            f, indent=2,
         )
 
     fig, ax = plt.subplots(figsize=(5, 5))
     RocCurveDisplay.from_estimator(best_model, X_test, y_test, ax=ax)
     ax.set_title(f"ROC Curve - {best_name}")
     fig.tight_layout()
-    fig.savefig(ARTIFACTS_DIR / "roc_curve.png", dpi=140)
+    fig.savefig(ARTIFACTS_DIR / f"roc_curve{artifacts_suffix}.png", dpi=140)
     plt.close(fig)
 
-    # Raw ROC curve points (downsampled to ~120 points) as JSON, for an
-    # interactive hoverable line chart in the frontend.
     fpr, tpr, _ = roc_curve(y_test, y_proba)
     roc_idx = np.linspace(0, len(fpr) - 1, min(120, len(fpr))).astype(int)
-    with open(ARTIFACTS_DIR / "roc_curve.json", "w") as f:
+    with open(ARTIFACTS_DIR / f"roc_curve{artifacts_suffix}.json", "w") as f:
         json.dump(
-            {
-                "model": best_name,
-                "auc": float(best_metrics["roc_auc"]),
-                "points": [{"fpr": round(float(fpr[i]), 4), "tpr": round(float(tpr[i]), 4)} for i in roc_idx],
-            },
+            {"model": best_name, "auc": float(best_metrics["roc_auc"]),
+             "points": [{"fpr": round(float(fpr[i]), 4), "tpr": round(float(tpr[i]), 4)} for i in roc_idx]},
             f,
         )
 
@@ -300,21 +411,15 @@ def main():
     PrecisionRecallDisplay.from_estimator(best_model, X_test, y_test, ax=ax)
     ax.set_title(f"Precision-Recall Curve - {best_name}")
     fig.tight_layout()
-    fig.savefig(ARTIFACTS_DIR / "precision_recall_curve.png", dpi=140)
+    fig.savefig(ARTIFACTS_DIR / f"precision_recall_curve{artifacts_suffix}.png", dpi=140)
     plt.close(fig)
 
-    # Raw precision-recall curve points (downsampled) as JSON.
     precision_arr, recall_arr, _ = precision_recall_curve(y_test, y_proba)
     pr_idx = np.linspace(0, len(precision_arr) - 1, min(120, len(precision_arr))).astype(int)
-    with open(ARTIFACTS_DIR / "precision_recall_curve.json", "w") as f:
+    with open(ARTIFACTS_DIR / f"precision_recall_curve{artifacts_suffix}.json", "w") as f:
         json.dump(
-            {
-                "model": best_name,
-                "points": [
-                    {"recall": round(float(recall_arr[i]), 4), "precision": round(float(precision_arr[i]), 4)}
-                    for i in pr_idx
-                ],
-            },
+            {"model": best_name,
+             "points": [{"recall": round(float(recall_arr[i]), 4), "precision": round(float(precision_arr[i]), 4)} for i in pr_idx]},
             f,
         )
 
@@ -332,35 +437,38 @@ def main():
     ax.legend()
     ax.set_title("Model Comparison")
     fig.tight_layout()
-    fig.savefig(ARTIFACTS_DIR / "model_comparison.png", dpi=140)
+    fig.savefig(ARTIFACTS_DIR / f"model_comparison{artifacts_suffix}.png", dpi=140)
     plt.close(fig)
 
-    feature_importance = get_feature_importance(best_model, ALL_FEATURE_COLS)
-    with open(ARTIFACTS_DIR / "feature_importance.json", "w") as f:
+    feature_importance = get_feature_importance(best_model, feature_cols)
+    with open(ARTIFACTS_DIR / f"feature_importance{artifacts_suffix}.json", "w") as f:
         json.dump(feature_importance, f, indent=2)
 
-    print("[8/8] Persisting model + metadata...")
-    joblib.dump(best_model, MODELS_DIR / "landslide_pipeline.joblib")
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(best_model, model_path)
 
     metadata = {
+        "model_version": version_tag,
         "selected_model": best_name,
         "metrics": best_metrics,
-        "feature_columns": ALL_FEATURE_COLS,
+        "feature_columns": feature_cols,
         "real_feature_columns": REAL_FEATURE_COLS,
         "simulated_feature_columns": SIMULATED_FEATURE_COLS,
+        "geo_feature_columns": GEO_FEATURE_COLS if set(GEO_FEATURE_COLS).issubset(set(feature_cols)) else [],
         "training_samples": int(len(X_train)),
         "testing_samples": int(len(X_test)),
-        "dataset_version": "global_landslide_catalog_v1+pseudo_absence_v1",
+        "dataset_version": dataset_version,
         "trained_at_unix": time.time(),
         "trained_at_iso": pd.Timestamp.now("UTC").isoformat(),
         "all_candidates_evaluated": list(comparison.keys()),
         "sklearn_random_state": RANDOM_STATE,
         "training_duration_seconds": round(time.time() - t0, 2),
     }
-    with open(MODELS_DIR / "model_metadata.json", "w") as f:
+    with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2, default=str)
 
-    print(f"Done in {time.time() - t0:.1f}s. Best model: {best_name} -> models/landslide_pipeline.joblib")
+    print(f"Done in {time.time() - t0:.1f}s. Best model: {best_name} -> {model_path}")
+    return best_metrics
 
 
 if __name__ == "__main__":

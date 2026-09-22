@@ -209,7 +209,7 @@ frontend/
 
 ## Database Schema
 
-9 relational tables, real foreign keys and indexes throughout:
+12 relational tables, real foreign keys and indexes throughout:
 
 ```
 locations ──┬──► environmental_readings
@@ -218,41 +218,104 @@ locations ──┬──► environmental_readings
 
 model_runs ──► predictions
 
-users, otp_verifications, password_reset_tokens   (auth)
+users ──┬──► otp_verifications, password_reset_tokens   (auth)
+        └──► alert_subscriptions ──► email_alert_log     (Phase 3: email monitoring)
+
+geo_feature_cache   (Phase 1/2: cached Open-Meteo/SoilGrids/Overpass responses)
 ```
 
 | Table | Purpose |
 |---|---|
 | `locations` | Monitoring locations (27 real, named, geolocated regions) |
-| `environmental_readings` | Environmental inputs behind each prediction, tagged `real` / `simulated_demo` / `user_input` |
+| `environmental_readings` | Environmental inputs behind each prediction, tagged `real` / `simulated_demo` / `user_input` / `live_geo_api` |
 | `predictions` | Every ML prediction: risk level, probability, model version, full audit trail |
-| `alerts` | Auto-generated when a prediction crosses a risk threshold; ACTIVE/ACKNOWLEDGED/RESOLVED |
-| `landslide_events` | All 11,033 real historical events from the NASA Global Landslide Catalog |
+| `alerts` | Auto-generated when a prediction crosses a risk threshold; ACTIVE/ACKNOWLEDGED/RESOLVED (in-app/website alert list) |
+| `landslide_events` | Real historical events from the NASA Global Landslide Catalog + the real India inventories (Phase 2) |
 | `model_runs` | Every trained model version with real accuracy/precision/recall/F1/ROC-AUC |
 | `users` | Accounts — local (email+password) or Google OAuth |
 | `otp_verifications` | Hashed, expiring, attempt-limited OTP codes |
 | `password_reset_tokens` | Hashed, expiring, single-use reset tokens |
+| `geo_feature_cache` | Cached live geospatial API responses, keyed by rounded lat/lon/radius/source, with per-source TTL |
+| `alert_subscriptions` | A user's monitored location + radius + email + alert/reset thresholds + cooldown + hysteresis state (Phase 3) |
+| `email_alert_log` | Every email actually sent (or attempted), independent of the in-app `alerts` table (Phase 3) |
+
+---
+
+## Live Location-Based Prediction (Geospatial Data Engine)
+
+The **Predict** page's default mode no longer asks the user to type in
+rainfall, soil moisture, slope, elevation, temperature, or humidity. Instead:
+
+```
+User clicks a point on the map (or taps "Use My Location")
+        │
+Selects an analysis radius (1 / 3 / 5 / 10 / 25 km)
+        │
+POST /api/predictions/location  { latitude, longitude, radius_km }
+        │
+Geo Data Engine (app/services/geo_data_service.py) concurrently queries:
+        │
+   ┌────────────┬──────────────────┬───────────────┬──────────────────┐
+   │  Weather/  │   Elevation +    │  Soil texture │   Construction/  │
+   │  Rainfall  │   Slope          │  & pH         │   building count │
+   │ Open-Meteo │  Open-Meteo      │  ISRIC        │  OSM Overpass    │
+   │ (point)    │  Elevation API   │  SoilGrids    │  (radius query)  │
+   │            │  (5-pt finite    │  v2.0 (point) │                  │
+   │            │  difference)     │               │                  │
+   └────────────┴──────────────────┴───────────────┴──────────────────┘
+        │
+Feature vector built to match the trained model's schema
+        │
+Random Forest / XGBoost pipeline → probability → risk level
+        │
+Response includes the raw data_sources block + a `data_status` per source
+(LIVE / CACHED / UNAVAILABLE) and an overall `data_quality` (HIGH/MEDIUM/LOW)
+```
+
+**All data sources are free and keyless** — no signup or API key needed to
+run this locally. Static/slow-changing sources (elevation, slope, soil) are
+cached in Postgres (`geo_feature_cache` table) for up to 30 days; weather is
+cached for 30 minutes — see `GEO_CACHE_TTL_MINUTES` in `.env`.
+
+**Honesty about the current model**: the trained model itself (below) was
+fit on the NASA Global Landslide Catalog with *simulated* environmental
+features, not real ones. Feeding it real live weather/soil values is a
+genuine distribution shift the model has not seen — every response from
+`/api/predictions/location` includes a `data_provenance.model_training_caveat`
+saying so explicitly. Retraining on a real fused dataset (real landslide
+inventories + real Open-Meteo/SoilGrids/OSM features) is tracked as the next
+upgrade phase.
+
+If a required live source (weather or terrain) is unavailable and nothing
+usable is cached, the endpoint returns **HTTP 503 with no prediction** rather
+than substituting a fabricated value.
+
+**Offline/no-wifi demo mode**: set `MOCK_EXTERNAL_APIS=true` in `backend/.env`
+to get deterministic, clearly-labeled demo data instead of live API calls —
+useful if you're presenting somewhere without reliable internet. Every
+response in this mode is tagged `"status": "DEMO"` and `"demo_mode": true`.
+Never leave this on in a real deployment.
+
+The old manual-entry form still exists under the **Manual (Legacy)** tab on
+the Predict page and the original `POST /api/predictions` endpoint, kept
+for testing and backward compatibility (spec section 81) — but it is no
+longer the primary flow.
 
 ---
 
 ## Machine Learning Pipeline
 
-**Data source:** NASA Global Landslide Catalog (11,033 real events). This catalog
-records real events only — no rainfall/soil-moisture/slope sensor readings and no
-negative ("no landslide") examples exist in it. TerraSense AI uses the real
-geo/temporal/trigger fields as-is, and generates a **documented, seeded, clearly
-disclosed** simulated environmental feature set (rainfall, soil moisture, slope,
-elevation, temperature, humidity) plus pseudo-absence negative samples — a standard
-technique in landslide-susceptibility ML literature — to train a genuine two-class
-classifier. Every prediction response includes a `data_provenance` block naming
-exactly which fields are real vs. simulated.
+TerraSense now trains **two model generations**, both reproducible, neither silently
+overwriting the other (spec sections 51, 80-81):
 
-**Models evaluated:** Logistic Regression, Decision Tree, Random Forest, Gradient
-Boosting, XGBoost — each inside an sklearn `Pipeline` (StandardScaler + classifier)
-to prevent preprocessing leakage, with stratified 80/20 train-test split and 5-fold
-cross-validation.
+### v1 — Legacy (`python train_model.py`, default)
 
-**Current results** (reproducible via `python train_model.py`):
+**Data source:** NASA Global Landslide Catalog (11,033 real events) only. No
+rainfall/soil-moisture/slope sensor readings and no negative ("no landslide")
+examples exist in the raw catalog, so TerraSense uses the real geo/temporal/
+trigger fields as-is and generates a **documented, seeded, clearly disclosed**
+simulated environmental feature set (13 features total) — a standard technique
+in landslide-susceptibility ML literature.
 
 | Model | Accuracy | F1 | ROC-AUC |
 |---|---|---|---|
@@ -262,9 +325,94 @@ cross-validation.
 | Gradient Boosting | 89.6% | 0.892 | 0.969 |
 | **XGBoost (selected)** | **90.1%** | **0.898** | **0.970** |
 
+### v2 — Master Dataset (`python scripts/build_master_dataset.py` then `python train_model.py --dataset master --promote`)
+
+**Data source:** the same NASA catalog **plus real India-specific inventories**
+(Field GPS survey, 359 points + Himachal Pradesh 2023 disaster inventory, 3,176
+points — see `app/ml/india_inventory.py`, zero network required, parsed directly
+from the provided shapefiles). **20 features** — the original 13 plus soil
+texture/pH (ISRIC SoilGrids), building/construction density (OSM Overpass), and
+slope aspect. Negative samples are spatial perturbations of real event sites
+with a documented, distinctly calmer severity band (spec section 19) — not
+arbitrary blank-map locations.
+
+| Model | Accuracy | F1 | ROC-AUC |
+|---|---|---|---|
+| Logistic Regression | 90.0% | 0.897 | 0.969 |
+| Decision Tree | 90.7% | 0.905 | 0.959 |
+| Random Forest | 91.9% | 0.916 | 0.976 |
+| Gradient Boosting | 91.9% | 0.917 | 0.978 |
+| **XGBoost (selected)** | **92.4%** | **0.922** | **0.981** |
+
+**Honesty note:** the metrics above were produced with `--mode mock` (this
+sandbox has no outbound internet access to Open-Meteo/SoilGrids/Overpass). The
+**landslide labels are 100% real** in both modes; the *environmental feature
+layer* is deterministic mock data in mock mode, tagged `feature_source=MOCK` in
+`data/master/terrasense_master_dataset.parquet`. Re-run
+`python scripts/build_master_dataset.py --mode live --limit 500` with real
+internet access to replace the mock layer with real Open-Meteo/SoilGrids/OSM
+measurements and retrain — no code changes needed, same command.
+
+**Model versioning:** every `--dataset master` run is saved under
+`models/versions/<version_tag>/` and appended to `models/model_registry.json`
+regardless of `--promote`; only `--promote` overwrites the currently active
+`models/landslide_pipeline.joblib` that the API serves. `inference.py` reads
+each model's own `feature_columns` from its metadata rather than a hardcoded
+list, so v1 and v2 models — and any future version — load and serve correctly
+without code changes, and any field a caller doesn't supply is explicitly
+reported in the response's `features_defaulted` list rather than silently
+guessed.
+
 **Explainability:** feature importances from the selected tree-based model,
 exposed via API and rendered as an interactive bar chart — described as
 model-level importance, not a causal claim.
+
+---
+
+## Real India Landslide Data (Phase 2)
+
+| Source | Real events | What's real | Known limitation |
+|---|---|---|---|
+| Field GPS Survey (Himachal Pradesh, Oct 2023) | 359 | Exact GPS coordinates + exact timestamp + field-assessed Anthropogenic/Natural category | None — directly surveyed |
+| Himachal Pradesh 2023 Inventory (Shimla) | 3,176 | Real polygon-derived point coordinates (reprojected from UTM 43N) + real area + real Anthropogenic/Natural category (1,418 / 1,758 split) | No per-event date in the source shapefile — every row uses 2023-08-14 (peak of the documented August 2023 disaster) as an approximate date, flagged `date_is_approximate=True` |
+| ISRO Landslide Atlas of India (PDF) | — | Official 93-page NRSC report, state-wise maps/statistics | Not machine-readable point data — used for citation/context only, not row-level training data |
+
+These flow through the **same, unmodified** `clean_catalog()` /
+`build_training_dataset()` pipeline as the NASA catalog — see
+`app/ml/data_pipeline.py::load_combined_catalog()`.
+
+---
+
+## Email Alert Monitoring (Phase 3)
+
+Replaces the website-only alert list as the primary early-warning mechanism
+(spec sections 37-43). A logged-in user picks a location + radius + email +
+risk threshold on the **Alerts** page; a background APScheduler job (interval
+`MONITORING_INTERVAL_MINUTES`, default 15) re-runs the live prediction
+pipeline for every active subscription and emails via the existing Google Apps
+Script backend (`app/services/email_service.py`) when risk crosses the
+threshold.
+
+**Hysteresis, not a one-shot trigger** (spec section 42) — `app/services/monitoring_service.py`:
+
+```
+NORMAL --[probability >= alert_threshold AND cooldown elapsed]--> send email --> ALERTED
+ALERTED --[probability < reset_threshold]--> NORMAL (silently re-arms, no email)
+```
+
+`cooldown_minutes` (default 360) additionally blocks a second email even if
+the state machine would otherwise allow one. Every subscription's
+`alert_threshold`/`reset_threshold`/`cooldown_minutes` are configurable, not
+hardcoded — `reset_threshold` is auto-clamped below `alert_threshold` if
+misconfigured.
+
+**Honesty in dev mode:** if `APPS_SCRIPT_EMAIL_URL` isn't configured, a
+triggered alert is logged with `delivery_status=DEV_MODE_LOGGED` in
+`email_alert_log` rather than falsely reporting `SENT`.
+
+Endpoints: `POST /api/monitoring/start`/`/stop`, `GET /api/monitoring/status`,
+`POST /api/alerts/test` (forces one immediate check+email for verification),
+`GET /api/alerts/email-history`.
 
 ---
 
@@ -279,14 +427,20 @@ model-level importance, not a causal claim.
 | POST | `/api/auth/google` | Google Sign-In |
 | POST | `/api/auth/forgot-password` / `/reset-password` | Password recovery |
 | GET | `/api/auth/me` | Current user |
-| POST | `/api/predictions` | Run ML inference, persist + generate alert if needed |
+| POST | `/api/predictions` | **Legacy/manual** — run ML inference from manually-entered environmental values |
+| POST | `/api/predictions/location` | **Primary** — live location-based prediction: pass `latitude`, `longitude`, `radius_km` only; every environmental feature is fetched automatically (weather, rainfall, soil moisture, elevation, slope, soil texture, construction density) |
+| GET | `/api/location/features` | Preview live geospatial features for a point/radius without running a prediction (used by the map UI) |
 | GET | `/api/predictions`, `/latest`, `/high-risk`, `/{id}`, `/location/{id}` | Prediction history & filtering |
 | GET/POST/PUT/DELETE | `/api/locations` | Location CRUD |
-| GET | `/api/alerts`, `/active`, `/history`, `/{id}` | Alert feed |
+| GET | `/api/alerts`, `/active`, `/history`, `/{id}` | In-app alert feed |
 | PATCH | `/api/alerts/{id}/status` | Update alert status |
+| POST | `/api/alerts/test` | Force one immediate check+email for a subscription (verify setup) |
+| GET | `/api/alerts/email-history` | Real sent-email log (Phase 3) |
+| POST | `/api/monitoring/start` / `/stop` | Enable/disable email-alert monitoring for a location |
+| GET | `/api/monitoring/status` | List the current user's monitored locations + hysteresis state |
 | GET | `/api/landslide-events` | Real historical events, paginated/filterable |
 | GET | `/api/models`, `/latest`, `/{id}` | Model version tracking |
-| GET | `/api/model/info`, `/metrics`, `/features` | Trained model metadata |
+| GET | `/api/model/info`, `/metrics`, `/features` | Trained model metadata (works for either v1 or v2, whichever is active) |
 | GET | `/api/model/confusion-matrix`, `/roc-curve`, `/precision-recall-curve` | Raw chart data for interactive UI |
 | GET | `/api/dataset/correlation-matrix` | Raw correlation data for interactive heatmap |
 | GET | `/api/analytics/overview`, `/risk-distribution`, `/location-summary`, `/timeline`, `/alerts` | Dashboard analytics (DB-backed) |
@@ -306,10 +460,20 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 # .env is already filled in for local dev — see Environment Variables below
-alembic upgrade head
+alembic upgrade head   # includes geo_feature_cache, alert_subscriptions, email_alert_log
+
+# Option A: legacy model only (fast, no shapefile/network dependency)
 python train_model.py
+
+# Option B: Phase 2 master-dataset model (real India data + geo features)
+python scripts/build_master_dataset.py --mode mock   # or --mode live (needs internet, slower)
+python train_model.py --dataset master --promote
+
 python scripts/seed_database.py
 uvicorn app.main:app --reload
+# No API keys needed for live location prediction or Phase 2 dataset building
+# (Open-Meteo/SoilGrids/OSM are free & keyless). Set MOCK_EXTERNAL_APIS=true
+# in .env for a fully offline live-prediction demo.
 
 # Frontend
 cd frontend
@@ -332,8 +496,11 @@ values. Summary:
 | `DATABASE_URL` | backend | Local PostgreSQL connection string |
 | `JWT_SECRET` | backend | Signs session tokens |
 | `GOOGLE_CLIENT_ID` | backend **and** frontend (`VITE_GOOGLE_CLIENT_ID`) | Must be the **same** value in both |
-| `APPS_SCRIPT_EMAIL_URL` / `APPS_SCRIPT_SHARED_SECRET` | backend | Real email delivery for OTP/reset — see Hinglish guide section 15 |
+| `APPS_SCRIPT_EMAIL_URL` / `APPS_SCRIPT_SHARED_SECRET` | backend | Real email delivery for OTP/reset **and** landslide risk alerts (Phase 3) |
 | `CORS_ORIGINS` / `FRONTEND_URL` | backend | Set to `localhost:5173` for local dev |
+| `MOCK_EXTERNAL_APIS` | backend | `true` = offline demo data for live-location prediction (no internet needed) |
+| `MONITORING_ENABLED` / `MONITORING_INTERVAL_MINUTES` | backend | Background email-alert worker on/off + check frequency |
+| `DEFAULT_ALERT_THRESHOLD` / `DEFAULT_RESET_THRESHOLD` / `DEFAULT_ALERT_COOLDOWN_MINUTES` | backend | Default hysteresis config for new subscriptions (per-subscription overridable) |
 
 See `backend/.env.example` and `frontend/.env.example` for the full reference.
 

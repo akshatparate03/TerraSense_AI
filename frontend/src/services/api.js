@@ -115,6 +115,12 @@ export const deleteLocation = (id) =>
 // ---------------------------------------------------------------------------
 export const postPredict = (payload) =>
   api.post("/predictions", payload).then((r) => r.data);
+export const postPredictLocation = (payload) =>
+  api.post("/predictions/location", payload).then((r) => r.data);
+export const getLocationFeatures = (latitude, longitude, radius_km = 5) =>
+  api
+    .get("/location/features", { params: { latitude, longitude, radius_km } })
+    .then((r) => r.data);
 export const getPredictions = (params = {}) =>
   api.get("/predictions", { params }).then((r) => r.data);
 export const getPrediction = (id) =>
@@ -135,6 +141,20 @@ export const getAlertHistory = () =>
   api.get("/alerts/history").then((r) => r.data);
 export const updateAlertStatus = (id, status) =>
   api.patch(`/alerts/${id}/status`, { status }).then((r) => r.data);
+
+// ---------------------------------------------------------------------------
+// Email alert monitoring (subscriptions)
+// ---------------------------------------------------------------------------
+export const getMonitoringStatus = () =>
+  api.get("/monitoring/status").then((r) => r.data);
+export const startMonitoring = (payload) =>
+  api.post("/monitoring/start", payload).then((r) => r.data);
+export const stopMonitoring = (subscription_id) =>
+  api.post("/monitoring/stop", { subscription_id }).then((r) => r.data);
+export const sendTestAlert = (subscription_id) =>
+  api.post("/alerts/test", { subscription_id }).then((r) => r.data);
+export const getEmailAlertHistory = () =>
+  api.get("/alerts/email-history").then((r) => r.data);
 
 // ---------------------------------------------------------------------------
 // Landslide events
@@ -190,6 +210,24 @@ export const wsMonitoringUrl = () => {
   if (import.meta.env.VITE_WS_BASE_URL) return import.meta.env.VITE_WS_BASE_URL;
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${window.location.host}/ws/monitoring`;
+};
+
+// ---------------------------------------------------------------------------
+// Live Global Scan (real, named-location risk checks -- replaces the old
+// simulation-backed "Live Monitoring" page)
+// ---------------------------------------------------------------------------
+export const getScanWatchlist = () =>
+  api.get("/scan/locations").then((r) => r.data);
+export const runGlobalScan = () =>
+  api.post("/scan/run").then((r) => r.data);
+export const getLatestScanResults = () =>
+  api.get("/scan/latest").then((r) => r.data);
+export const wsLiveScanUrl = () => {
+  if (import.meta.env.VITE_WS_BASE_URL) {
+    return import.meta.env.VITE_WS_BASE_URL.replace(/\/ws\/monitoring$/, "/ws/live-scan");
+  }
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${window.location.host}/ws/live-scan`;
 };
 
 export default api;

@@ -118,3 +118,56 @@ def send_password_reset_email(to_email: str, name: str, reset_link: str) -> bool
       <p>This link expires in {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutes. If you didn't request this, you can ignore this email.</p>
     """)
     return _send_via_apps_script(to_email, subject, body)
+
+
+def send_landslide_alert_email(
+    to_email: str,
+    location_label: str,
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+    probability: float,
+    risk_level: str,
+    features: dict,
+    risk_drivers: list[dict],
+    timestamp_iso: str,
+) -> bool:
+    """Spec section 41 alert content: location, radius, risk, contributing
+    model features, and a plain disclaimer. Language is deliberately
+    non-sensational ('Estimated landslide risk', never 'will happen') per
+    spec sections 24-26/93."""
+    subject = f"TerraSense AI — {risk_level} landslide risk near {location_label}"
+
+    driver_rows = "".join(
+        f"<tr><td style='padding:4px 0;color:#94a3b8;'>{d['feature'].replace('_', ' ').title()}</td>"
+        f"<td style='padding:4px 0;text-align:right;color:#e2e8f0;'>{d.get('value', '—')}</td></tr>"
+        for d in (risk_drivers or [])[:6]
+    )
+
+    level_color = {"HIGH": "#f87171", "WARNING": "#fbbf24", "MEDIUM": "#fbbf24"}.get(risk_level, "#38bdf8")
+
+    body = _wrap_template(f"""
+      <p style="margin-top:0;">TerraSense AI's background monitoring detected an elevated estimated
+      landslide risk for a location you're monitoring.</p>
+
+      <table role="presentation" width="100%" style="margin:18px 0;">
+        <tr><td style="color:#94a3b8;">Location</td><td style="text-align:right;color:#e2e8f0;">{location_label}</td></tr>
+        <tr><td style="color:#94a3b8;">Coordinates</td><td style="text-align:right;color:#e2e8f0;">{latitude:.4f}, {longitude:.4f}</td></tr>
+        <tr><td style="color:#94a3b8;">Analysis Radius</td><td style="text-align:right;color:#e2e8f0;">{radius_km} km</td></tr>
+        <tr><td style="color:#94a3b8;">Estimated Risk</td>
+            <td style="text-align:right;font-weight:bold;color:{level_color};">{probability*100:.1f}% ({risk_level})</td></tr>
+      </table>
+
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Important model features for this estimate:</p>
+      <table role="presentation" width="100%" style="margin-bottom:18px;">{driver_rows}</table>
+
+      <p style="color:#94a3b8;font-size:12px;">Timestamp: {timestamp_iso}</p>
+
+      <div style="margin-top:18px;padding:12px 16px;background:#111827;border-radius:10px;border:1px solid #1f2937;">
+        <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">
+          This is an AI-generated risk <b>estimate</b>, not a guarantee that a landslide will occur, and not a
+          certified government warning. Please follow official local emergency guidance where applicable.
+        </p>
+      </div>
+    """)
+    return _send_via_apps_script(to_email, subject, body)

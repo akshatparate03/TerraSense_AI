@@ -1,0 +1,108 @@
+{
+  "built_at": "2026-09-21T06:06:22.727277+00:00",
+  "mode": "mock",
+  "total_rows": 28700,
+  "positive_rows": 14350,
+  "negative_rows": 14350,
+  "unique_locations_approx": 24336,
+  "date_range": [
+    "1988-11-07 00:00:00",
+    "2023-10-29 10:37:08"
+  ],
+  "countries": [
+    "Afghanistan",
+    "Albania",
+    "Algeria",
+    "American Samoa",
+    "Angola",
+    "Argentina",
+    "Armenia",
+    "Australia",
+    "Austria",
+    "Azerbaijan",
+    "Bangladesh",
+    "Barbados",
+    "Belize",
+    "Bermuda",
+    "Bhutan",
+    "Bolivia",
+    "Bosnia and Herzegovina",
+    "Brazil",
+    "Brunei",
+    "Bulgaria",
+    "Burkina Faso",
+    "Burundi",
+    "Cambodia",
+    "Cameroon",
+    "Canada",
+    "Chile",
+    "China",
+    "Colombia",
+    "Costa Rica",
+    "Croatia"
+  ],
+  "india_specific_rows": 9123,
+  "feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km",
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct",
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count"
+  ],
+  "target_column": "landslide_occurred",
+  "feature_source_breakdown": {
+    "MOCK": 28700
+  },
+  "negative_sampling_method": "spatial_perturbation_of_real_event(non-event_offset), see generate_negative_samples()",
+  "sources": [
+    {
+      "name": "NASA Global Landslide Catalog",
+      "url": "https://gpm.nasa.gov/landslides/",
+      "rows": "~11,033 global events"
+    },
+    {
+      "name": "Field GPS Landslide Survey (Himachal Pradesh, Oct 2023)",
+      "rows": 359
+    },
+    {
+      "name": "Himachal Pradesh 2023 Landslide Inventory (Shimla)",
+      "url": "https://zenodo.org/records/10492992",
+      "rows": 3176
+    },
+    {
+      "name": "Open-Meteo Historical Weather Archive",
+      "url": "https://open-meteo.com/en/docs/historical-weather-api",
+      "used_for": "NOT USED (mock mode)"
+    },
+    {
+      "name": "ISRIC SoilGrids v2.0",
+      "url": "https://soilgrids.org",
+      "used_for": "NOT USED (mock mode)"
+    },
+    {
+      "name": "OpenStreetMap (Overpass API)",
+      "url": "https://www.openstreetmap.org",
+      "used_for": "NOT USED (mock mode)"
+    }
+  ],
+  "known_limitations": [
+    "Himachal Pradesh 2023 inventory events all share an approximate date (2023-08-14, peak of the monsoon disaster) -- no per-event date exists in the source shapefile.",
+    "Negative labels are spatial perturbations of real event sites, not independently verified non-event ground truth -- see label_confidence column.",
+    "Environmental/geo feature layer is MOCK/simulated (see feature_source column) -- rerun with --mode live and internet access to replace with real measurements."
+  ]
+}

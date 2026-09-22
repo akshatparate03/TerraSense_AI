@@ -13,7 +13,8 @@ import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 import ResetPassword from "./pages/auth/ResetPassword.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
-import LiveMonitoring from "./pages/LiveMonitoring.jsx";
+import LiveGlobalScan from "./pages/LiveGlobalScan.jsx";
+import SimulationArchive from "./pages/SimulationArchive.jsx";
 import Predict from "./pages/Predict.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Historical from "./pages/Historical.jsx";
@@ -47,7 +48,8 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/monitoring" element={<LiveMonitoring />} />
+                  <Route path="/monitoring" element={<LiveGlobalScan />} />
+                  <Route path="/simulation-archive" element={<SimulationArchive />} />
                   <Route path="/predict" element={<Predict />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/historical" element={<Historical />} />

@@ -7,5 +7,6 @@ backend/.env
 frontend/.env
 frontend/GUIDE.md
 frontend/RUNGUIDE.md
+frontend/CHANGES.md
 backend/data/app.db
 .DS_Store

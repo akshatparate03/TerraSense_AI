@@ -74,5 +74,48 @@ class Settings:
 
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+    # ------------------------------------------------------------------
+    # Geospatial Data Engine (live location-based prediction)
+    # ------------------------------------------------------------------
+    # All default sources below are free, keyless, public APIs -- no
+    # credentials are required to run this locally. If MOCK_EXTERNAL_APIS
+    # is enabled, the geo engine returns clearly-labeled deterministic demo
+    # values instead of calling the network (useful for offline college
+    # demos -- see backend/app/services/geo_data_service.py).
+    MOCK_EXTERNAL_APIS: bool = os.getenv("MOCK_EXTERNAL_APIS", "false").lower() == "true"
+
+    OPEN_METEO_FORECAST_URL: str = os.getenv(
+        "OPEN_METEO_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"
+    )
+    OPEN_METEO_ELEVATION_URL: str = os.getenv(
+        "OPEN_METEO_ELEVATION_URL", "https://api.open-meteo.com/v1/elevation"
+    )
+    SOILGRIDS_BASE_URL: str = os.getenv(
+        "SOILGRIDS_BASE_URL", "https://rest.isric.org/soilgrids/v2.0/properties/query"
+    )
+    OVERPASS_API_URL: str = os.getenv(
+        "OVERPASS_API_URL", "https://overpass-api.de/api/interpreter"
+    )
+
+    GEO_HTTP_TIMEOUT_SECONDS: float = float(os.getenv("GEO_HTTP_TIMEOUT_SECONDS", "12"))
+    GEO_CACHE_TTL_MINUTES: int = int(os.getenv("GEO_CACHE_TTL_MINUTES", "30"))
+    # Coordinates are rounded to this many decimal places for cache-key
+    # purposes (~1km at 2dp, ~110m at 3dp) so nearby repeat requests hit the
+    # cache instead of re-calling external APIs (spec section 16).
+    GEO_CACHE_COORD_PRECISION: int = int(os.getenv("GEO_CACHE_COORD_PRECISION", "3"))
+
+    DEFAULT_ANALYSIS_RADIUS_KM: float = float(os.getenv("DEFAULT_ANALYSIS_RADIUS_KM", "5"))
+    MAX_ANALYSIS_RADIUS_KM: float = float(os.getenv("MAX_ANALYSIS_RADIUS_KM", "25"))
+
+    # ------------------------------------------------------------------
+    # Email alert monitoring (spec sections 37-43)
+    # ------------------------------------------------------------------
+    MONITORING_INTERVAL_MINUTES: int = int(os.getenv("MONITORING_INTERVAL_MINUTES", "15"))
+    MONITORING_ENABLED: bool = os.getenv("MONITORING_ENABLED", "true").lower() == "true"
+    DEFAULT_ALERT_THRESHOLD: float = float(os.getenv("DEFAULT_ALERT_THRESHOLD", "0.65"))
+    DEFAULT_RESET_THRESHOLD: float = float(os.getenv("DEFAULT_RESET_THRESHOLD", "0.50"))
+    DEFAULT_ALERT_COOLDOWN_MINUTES: int = int(os.getenv("DEFAULT_ALERT_COOLDOWN_MINUTES", "360"))
+    MAX_ACTIVE_SUBSCRIPTIONS_PER_USER: int = int(os.getenv("MAX_ACTIVE_SUBSCRIPTIONS_PER_USER", "5"))
+
 
 settings = Settings()

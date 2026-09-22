@@ -14,6 +14,22 @@ from app.ml.data_pipeline import ALL_FEATURE_COLS
 
 logger = logging.getLogger(__name__)
 
+# Neutral fallback values used ONLY when a field the currently-active
+# model's feature_columns needs is not present in the caller's payload
+# (e.g. the legacy manual-entry form does not collect soil/construction
+# values). These are never presented as measurements -- rows built this
+# way are marked in `features_defaulted` in the response so the caller
+# can tell which inputs were real vs. filled in.
+V2_FIELD_DEFAULTS = {
+    "aspect_deg": 180.0,
+    "soil_ph": 6.5,
+    "sand_pct": 33.0,
+    "silt_pct": 33.0,
+    "clay_pct": 34.0,
+    "building_density_per_km2": 100.0,
+    "construction_site_count": 0,
+}
+
 
 class ModelNotLoadedError(RuntimeError):
     pass
@@ -81,7 +97,28 @@ class InferenceService:
             "temperature_c": payload["temperature_c"],
             "humidity_pct": payload["humidity_pct"],
         }
-        X = pd.DataFrame([row])[ALL_FEATURE_COLS]
+
+        # The active model's OWN recorded feature_columns decide what goes
+        # into X -- not a hardcoded constant -- so this works unmodified
+        # whether the currently-loaded model is the legacy 13-feature model
+        # or the Phase-2 20-feature master-dataset model (spec sections 55,
+        # 80-81: live/training feature consistency + no silent schema
+        # mismatch). Any v2-only field the caller didn't supply (e.g. a
+        # legacy manual-entry request against a promoted v2 model) is
+        # filled from V2_FIELD_DEFAULTS and reported in `features_defaulted`
+        # rather than silently passed off as a real measurement.
+        feature_cols = self.metadata.get("feature_columns", ALL_FEATURE_COLS)
+        features_defaulted = []
+        for col in feature_cols:
+            if col in row:
+                continue
+            if col in payload and payload[col] is not None:
+                row[col] = payload[col]
+            else:
+                row[col] = V2_FIELD_DEFAULTS.get(col, 0.0)
+                features_defaulted.append(col)
+
+        X = pd.DataFrame([row])[feature_cols]
 
         proba = float(self.pipeline.predict_proba(X)[0, 1])
         risk_level = self._classify_risk(proba)
@@ -96,22 +133,22 @@ class InferenceService:
             "prediction_confidence": round(confidence, 4),
             "risk_level": risk_level,
             "model": self.metadata.get("selected_model", "unknown"),
+            "model_version": self.metadata.get("model_version", "v1_legacy"),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "features": row,
+            "features_defaulted": features_defaulted,
             "risk_drivers": drivers,
             "data_provenance": {
                 "real_fields": ["latitude", "longitude", "month", "trigger_hint", "location_accuracy_km"],
                 "simulated_demo_fields": [
-                    "rainfall_mm",
-                    "soil_moisture_pct",
-                    "slope_deg",
-                    "elevation_m",
-                    "temperature_c",
-                    "humidity_pct",
+                    c for c in self.metadata.get("simulated_feature_columns", [])
                 ],
+                "geo_feature_fields": self.metadata.get("geo_feature_columns", []),
                 "note": (
-                    "Environmental inputs are user-supplied or simulated demo values "
-                    "(no live sensor hardware). See /api/model/info and the About page."
+                    "Environmental inputs are either live-retrieved (via /api/predictions/location), "
+                    "user-supplied (legacy manual entry), or simulated demo values -- see "
+                    "features_defaulted above for any fields this specific request did not supply. "
+                    f"Active model dataset: {self.metadata.get('dataset_version', 'unknown')}."
                 ),
             },
         }

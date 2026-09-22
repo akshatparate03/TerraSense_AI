@@ -1,0 +1,21 @@
+{
+  "model": "XGBoost",
+  "labels": [
+    "No Landslide (0)",
+    "Landslide (1)"
+  ],
+  "matrix": [
+    [
+      2714,
+      156
+    ],
+    [
+      280,
+      2590
+    ]
+  ],
+  "tn": 2714,
+  "fp": 156,
+  "fn": 280,
+  "tp": 2590
+}

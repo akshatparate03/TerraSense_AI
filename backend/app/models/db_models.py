@@ -272,3 +272,90 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (Index("ix_pw_reset_email", "email"),)
+
+
+# ---------------------------------------------------------------------------
+# Geospatial data engine cache (spec section 16 -- avoid re-hitting free
+# public APIs -- Open-Meteo / SoilGrids / Overpass -- for the same location
+# repeatedly; static-ish sources (elevation/slope/soil) are cached longer
+# than dynamic ones (weather/rainfall) via `expires_at`)
+# ---------------------------------------------------------------------------
+class GeoFeatureCache(Base):
+    __tablename__ = "geo_feature_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Rounded to GEO_CACHE_COORD_PRECISION decimal places -- see config.py
+    latitude_rounded: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude_rounded: Mapped[float] = mapped_column(Float, nullable=False)
+    radius_km: Mapped[float] = mapped_column(Float, nullable=False)
+    # 'weather' | 'elevation_slope' | 'soil' | 'construction'
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    data_status: Mapped[str] = mapped_column(String(20), default="LIVE")  # LIVE | UNAVAILABLE
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_geo_cache_lookup", "latitude_rounded", "longitude_rounded", "radius_km", "source"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Email alert monitoring (spec sections 37-43) -- replaces the
+# website-only Alert list above as the PRIMARY warning mechanism. A user
+# subscribes a location+radius+threshold; a background worker
+# (app/services/monitoring_service.py + APScheduler in main.py) periodically
+# re-runs the live prediction pipeline for every active subscription and
+# emails the user when risk crosses their threshold, with hysteresis to
+# prevent alert spam (spec section 42).
+# ---------------------------------------------------------------------------
+class AlertSubscription(Base):
+    __tablename__ = "alert_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), default="My Location")
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    radius_km: Mapped[float] = mapped_column(Float, default=5.0)
+
+    alert_threshold: Mapped[float] = mapped_column(Float, default=0.65)  # crossing this triggers an email
+    reset_threshold: Mapped[float] = mapped_column(Float, default=0.50)  # must fall below this before re-arming
+    cooldown_minutes: Mapped[int] = mapped_column(Integer, default=360)  # minimum gap between emails
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # user-controlled monitoring on/off
+    # Hysteresis state -- see app/services/monitoring_service.py
+    alert_state: Mapped[str] = mapped_column(String(20), default="NORMAL")  # NORMAL | ALERTED
+
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_probability: Mapped[float | None] = mapped_column(Float)
+    last_alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped["User"] = relationship()
+    email_alerts: Mapped[list["EmailAlertLog"]] = relationship(back_populates="subscription", cascade="all, delete-orphan")
+
+    __table_args__ = (Index("ix_alert_sub_user_active", "user_id", "is_active"),)
+
+
+class EmailAlertLog(Base):
+    """One row per email actually sent (or attempted) -- spec section 86
+    'Alert History'."""
+
+    __tablename__ = "email_alert_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(ForeignKey("alert_subscriptions.id", ondelete="CASCADE"), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    risk_level: Mapped[str] = mapped_column(String(20), nullable=False)
+    threshold_at_send: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_status: Mapped[str] = mapped_column(String(20), default="SENT")  # SENT | FAILED | DEV_MODE_LOGGED
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    subscription: Mapped["AlertSubscription"] = relationship(back_populates="email_alerts")
+
+    __table_args__ = (Index("ix_email_alert_log_sub", "subscription_id"),)

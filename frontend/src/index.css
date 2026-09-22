@@ -184,3 +184,35 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Blinking risk markers -- used on Locations/Map, the Live Global Scan
+   map, and Alert "View on Map" pins so risk hotspots visually pulse
+   instead of sitting as static dots. Color itself is set inline per
+   marker (risk level); this only controls the pulse animation. */
+@keyframes riskBlinkPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.35);
+  }
+}
+.risk-blink-marker {
+  animation: riskBlinkPulse 1.6s ease-in-out infinite;
+  border-radius: 9999px;
+}
+.risk-blink-marker.risk-blink-slow {
+  animation-duration: 2.6s;
+}
+/* SVG-based markers (Leaflet CircleMarker) -- scale-transform on an SVG
+   path doesn't center reliably across browsers, so these use an
+   opacity-only pulse instead. */
+@keyframes riskBlinkOpacity {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.25; }
+}
+.risk-blink-svg {
+  animation: riskBlinkOpacity 1.6s ease-in-out infinite;
+}

@@ -1,0 +1,21 @@
+feature_name,unit,spatial_resolution,temporal_coverage,source
+latitude,degrees,point,event-specific,Real event/inventory coordinate
+longitude,degrees,point,event-specific,Real event/inventory coordinate
+month,1-12,point,event-specific,Calendar month of event_date
+trigger_is_rain,0/1,point,event-specific,Parsed from real landslide_trigger field
+trigger_is_seismic,0/1,point,event-specific,Parsed from real landslide_trigger field
+trigger_is_other,0/1,point,event-specific,Parsed from real landslide_trigger field
+location_accuracy_km,km,point,event-specific,Parsed from real location_accuracy field
+rainfall_mm,mm,point,N/A (mock),MOCK -- see dataset_metadata.json
+soil_moisture_pct,%,point,N/A (mock),MOCK
+slope_deg,degrees,90m,static,MOCK
+elevation_m,meters,90m,static,MOCK
+temperature_c,°C,point,N/A (mock),MOCK
+humidity_pct,%,point,N/A (mock),MOCK
+aspect_deg,degrees (0=N),90m,static,MOCK
+soil_ph,pH,250m,static,MOCK
+sand_pct,%,250m,static,MOCK
+silt_pct,%,250m,static,MOCK
+clay_pct,%,250m,static,MOCK
+building_density_per_km2,buildings/km2,1km radius,N/A (mock),MOCK
+construction_site_count,count,1km radius,N/A (mock),MOCK

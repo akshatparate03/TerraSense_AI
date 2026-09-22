@@ -1,0 +1,75 @@
+{
+  "model_version": "v2_master_20260921_060628",
+  "selected_model": "XGBoost",
+  "metrics": {
+    "accuracy": 0.9240418118466899,
+    "precision": 0.9431900946831755,
+    "recall": 0.9024390243902439,
+    "f1_score": 0.9223646723646723,
+    "roc_auc": 0.9805302965921645,
+    "cv_f1_mean": 0.9153588149166081,
+    "cv_f1_std": 0.0021466418149364373
+  },
+  "feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km",
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct",
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count"
+  ],
+  "real_feature_columns": [
+    "latitude",
+    "longitude",
+    "month",
+    "trigger_is_rain",
+    "trigger_is_seismic",
+    "trigger_is_other",
+    "location_accuracy_km"
+  ],
+  "simulated_feature_columns": [
+    "rainfall_mm",
+    "soil_moisture_pct",
+    "slope_deg",
+    "elevation_m",
+    "temperature_c",
+    "humidity_pct"
+  ],
+  "geo_feature_columns": [
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count"
+  ],
+  "training_samples": 22960,
+  "testing_samples": 5740,
+  "dataset_version": "terrasense_master_dataset (MOCK features)",
+  "trained_at_unix": 1789970931.0444455,
+  "trained_at_iso": "2026-09-21T06:08:51.044460+00:00",
+  "all_candidates_evaluated": [
+    "Logistic Regression",
+    "Decision Tree",
+    "Random Forest",
+    "Gradient Boosting",
+    "XGBoost"
+  ],
+  "sklearn_random_state": 42,
+  "training_duration_seconds": 143.15
+}

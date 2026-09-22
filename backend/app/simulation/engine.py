@@ -117,7 +117,7 @@ class SimulationEngine:
         try:
             if self._sim_location_id is None:
                 loc = db_service.get_or_create_location_by_coords(
-                    db, "Simulated Monitoring Point", record["latitude"], record["longitude"]
+                    db, "Historical Simulation Archive", record["latitude"], record["longitude"]
                 )
                 self._sim_location_id = loc.id
             location = db_service.get_location(db, self._sim_location_id)
@@ -132,10 +132,17 @@ class SimulationEngine:
                 environmental_reading_id=reading.id,
                 model_run_id=active_model.id if active_model else None,
                 prediction_result=prediction,
-                source="simulation",
+                source="simulation_archive",
             )
-            alert_row = db_service.generate_alert_if_needed(db, pred_row, location.name if location else "monitored area")
-            return pred_row, alert_row
+            # IMPORTANT: this replay is a historical/training-data demo, not
+            # a live warning -- it deliberately does NOT call
+            # generate_alert_if_needed(). Real alerts only come from real
+            # live checks: /api/predictions/location, the Live Global Scan
+            # (app/services/global_scan_service.py), and email-monitoring
+            # subscriptions. Mixing this archive's replayed 500 records into
+            # the Alert Center was confusing (every alert showed the same
+            # fake "Simulated Monitoring Point" name) and has been removed.
+            return pred_row, None
         finally:
             db.close()
 

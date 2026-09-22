@@ -17,6 +17,35 @@ class PredictionRequest(BaseModel):
     location_accuracy_km: Optional[float] = Field(default=1.0, ge=0, le=200)
 
 
+class MonitoringSubscribeRequest(BaseModel):
+    """Body for POST /api/monitoring/start (spec sections 37-39)."""
+
+    subscription_id: Optional[int] = Field(default=None, description="Provide to update an existing subscription instead of creating a new one")
+    label: str = Field(default="My Location", max_length=200)
+    email: str
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    radius_km: float = Field(default=5, ge=0.5, le=25)
+    alert_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    reset_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    cooldown_minutes: Optional[int] = Field(default=None, ge=15, le=1440)
+
+
+class MonitoringStopRequest(BaseModel):
+    subscription_id: int
+
+
+class LocationPredictionRequest(BaseModel):
+    """Replaces manual environmental entry: the user only supplies a point
+    and an analysis radius; the backend retrieves everything else live."""
+
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    radius_km: float = Field(default=5, ge=0.5, le=25)
+    location_label: Optional[str] = Field(default=None, description="Optional human-readable label, e.g. from map reverse-geocoding")
+    trigger_hint: Optional[str] = Field(default="rain", description="'rain' | 'seismic' | 'other'")
+
+
 class RiskDriver(BaseModel):
     feature: str
     importance: float

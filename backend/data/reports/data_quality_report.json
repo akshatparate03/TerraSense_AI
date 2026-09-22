@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-09-21T06:06:22.738220+00:00",
+  "total_rows": 28700,
+  "missing_value_pct_by_column": {
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "month": 0.0,
+    "trigger_is_rain": 0.0,
+    "trigger_is_seismic": 0.0,
+    "trigger_is_other": 0.0,
+    "location_accuracy_km": 0.0,
+    "rainfall_mm": 0.0,
+    "soil_moisture_pct": 0.0,
+    "slope_deg": 0.0,
+    "elevation_m": 0.0,
+    "temperature_c": 0.0,
+    "humidity_pct": 0.0,
+    "aspect_deg": 0.0,
+    "soil_ph": 0.0,
+    "sand_pct": 0.0,
+    "silt_pct": 0.0,
+    "clay_pct": 0.0,
+    "building_density_per_km2": 0.0,
+    "construction_site_count": 0.0
+  },
+  "duplicate_rows": 33,
+  "coordinate_validity": {
+    "all_latitudes_valid": true,
+    "all_longitudes_valid": true
+  },
+  "class_balance": {
+    "positive": 14350,
+    "negative": 14350
+  }
+}

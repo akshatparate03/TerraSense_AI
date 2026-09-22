@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -7,12 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from app.api import alerts, analytics_api, health, landslide_events, locations, models_api, predictions
+from app.api import alerts, analytics_api, global_scan, health, landslide_events, locations, models_api, monitoring, predictions
 from app.api.auth import router as auth_router
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.ml.inference import inference_service
-from app.services import history_service
+from app.services import db_service, global_scan_service, history_service, monitoring_service
 from app.simulation.engine import simulation_engine
 
 logging.basicConfig(level=settings.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,8 +46,11 @@ except Exception:
 app.include_router(auth_router)
 app.include_router(health.router)
 app.include_router(predictions.router)
+app.include_router(predictions.location_router)
 app.include_router(locations.router)
 app.include_router(alerts.router)
+app.include_router(monitoring.router)
+app.include_router(global_scan.router)
 app.include_router(landslide_events.router)
 app.include_router(models_api.router)
 app.include_router(analytics_api.router)
@@ -198,3 +202,83 @@ async def ws_monitoring(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
     finally:
         simulation_engine.unsubscribe(queue)
+
+
+@app.websocket("/ws/live-scan")
+async def ws_live_scan(websocket: WebSocket):
+    """Streams each watchlist location's REAL result as it completes, for
+    the Live Global Scan page (app/services/global_scan_service.py). Client
+    sends any message to trigger one scan pass; server streams
+    {"type": "location_result", ...} per location, then
+    {"type": "scan_complete", "results": [...]}."""
+    await websocket.accept()
+    try:
+        while True:
+            await websocket.receive_text()  # any message triggers a scan
+            db = SessionLocal()
+            try:
+                locations = db_service.list_locations(db, active_only=True)
+                await websocket.send_json({"type": "scan_started", "total": len(locations)})
+                results = []
+                for loc in locations:
+                    r = await global_scan_service.scan_one_location(db, loc)
+                    results.append(r)
+                    await websocket.send_json({"type": "location_result", **r})
+                    await asyncio.sleep(0.05)
+                results.sort(key=lambda r: r.get("probability") if r.get("probability") is not None else -1, reverse=True)
+                await websocket.send_json({"type": "scan_complete", "results": results})
+            finally:
+                db.close()
+    except WebSocketDisconnect:
+        logger.info("Client disconnected from /ws/live-scan")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Live scan websocket error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Background monitoring worker (spec section 43): periodically re-checks
+# every active email-alert subscription and sends alerts as needed. Uses
+# APScheduler -- deliberately not Celery/Kafka, per spec section 43's own
+# guidance to keep this a college-project-appropriate architecture. Disable
+# entirely via MONITORING_ENABLED=false in .env (e.g. during tests).
+# ---------------------------------------------------------------------------
+scheduler: "AsyncIOScheduler | None" = None
+
+
+async def _run_monitoring_job():
+    db = SessionLocal()
+    try:
+        await monitoring_service.run_monitoring_cycle(db)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Scheduled monitoring cycle failed: {e}")
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    global scheduler
+    if not settings.MONITORING_ENABLED:
+        logger.info("Monitoring scheduler disabled via MONITORING_ENABLED=false")
+        return
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            _run_monitoring_job,
+            "interval",
+            minutes=settings.MONITORING_INTERVAL_MINUTES,
+            id="landslide_monitoring_cycle",
+            next_run_time=None,  # first run happens one interval from now, not immediately at boot
+        )
+        scheduler.start()
+        logger.info(f"Monitoring scheduler started: checking every {settings.MONITORING_INTERVAL_MINUTES} minutes")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Failed to start monitoring scheduler: {e}")
+
+
+@app.on_event("shutdown")
+async def _stop_scheduler():
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)

@@ -66,10 +66,51 @@ REAL_FEATURE_COLS = [
 ALL_FEATURE_COLS = REAL_FEATURE_COLS + SIMULATED_FEATURE_COLS
 TARGET_COL = "landslide_occurred"
 
+# --- Phase 2 (master dataset) additions: construction, soil, and terrain
+# geometry features, as retrieved by app/services/geo_data_service.py or,
+# for historical training rows, by scripts/build_master_dataset.py. These
+# are ADDITIVE to ALL_FEATURE_COLS -- the original 13-feature schema above
+# is untouched so the existing legacy model/endpoint keeps working exactly
+# as before (spec section 81, backward compatibility).
+GEO_FEATURE_COLS = [
+    "aspect_deg",
+    "soil_ph",
+    "sand_pct",
+    "silt_pct",
+    "clay_pct",
+    "building_density_per_km2",
+    "construction_site_count",
+]
+ALL_FEATURE_COLS_V2 = ALL_FEATURE_COLS + GEO_FEATURE_COLS
+
 
 def load_raw_catalog(csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path, low_memory=False)
     return df
+
+
+def load_combined_catalog(csv_path: str, india_shapefile_dir: str | None = None) -> pd.DataFrame:
+    """Load the NASA Global Landslide Catalog and, if available, concatenate
+    the real India-specific inventories (Field GPS survey + Himachal
+    Pradesh 2023 inventory -- see app/ml/india_inventory.py). This is the
+    entrypoint `scripts/build_master_dataset.py` uses; `load_raw_catalog()`
+    above is kept unmodified so the original/legacy training path
+    (`train_model.py` with no arguments) is completely unaffected."""
+    df = load_raw_catalog(csv_path)
+    if india_shapefile_dir is None:
+        return df
+
+    from pathlib import Path
+
+    from app.ml.india_inventory import load_india_inventory
+
+    shp_dir = Path(india_shapefile_dir)
+    if not shp_dir.exists():
+        return df
+
+    india_df = load_india_inventory(shp_dir)
+    combined = pd.concat([df, india_df], axis=0, ignore_index=True, sort=False)
+    return combined
 
 
 def _parse_location_accuracy(val) -> float:
@@ -113,7 +154,8 @@ def clean_catalog(df: pd.DataFrame) -> pd.DataFrame:
     df["longitude"] = pd.to_numeric(df.get("longitude"), errors="coerce")
     df = df[df["latitude"].between(-90, 90) & df["longitude"].between(-180, 180)]
 
-    df["event_date"] = pd.to_datetime(df.get("event_date"), errors="coerce", format="mixed")
+    df["event_date"] = pd.to_datetime(df.get("event_date"), errors="coerce", format="mixed", utc=True)
+    df["event_date"] = df["event_date"].dt.tz_localize(None)
     df["month"] = df["event_date"].dt.month
     df["month"] = df["month"].fillna(df["month"].median())
 
@@ -198,5 +240,5 @@ def build_training_dataset(clean_df: pd.DataFrame, negative_ratio: float = 1.0) 
     return combined
 
 
-def get_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
-    return df[ALL_FEATURE_COLS].copy()
+def get_feature_matrix(df: pd.DataFrame, feature_cols: list[str] | None = None) -> pd.DataFrame:
+    return df[feature_cols or ALL_FEATURE_COLS].copy()
