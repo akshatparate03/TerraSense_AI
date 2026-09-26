@@ -171,3 +171,28 @@ def send_landslide_alert_email(
       </div>
     """)
     return _send_via_apps_script(to_email, subject, body)
+
+def send_contact_form_email(name: str, from_email: str, sender_type: str, message: str) -> bool:
+    """Forwards a public "Contact Us" form submission to CONTACT_FORM_TO_EMAIL
+    via the same Apps Script webhook used for OTP/reset/alert emails."""
+    if not settings.CONTACT_FORM_TO_EMAIL:
+        logger.warning(
+            "CONTACT_FORM_TO_EMAIL not configured - contact message NOT sent. "
+            f"From {name} <{from_email}> ({sender_type}): {message!r}"
+        )
+        return False
+
+    subject = f"TerraSense AI — New contact message from {name}"
+    safe_message = message.replace("\n", "<br/>")
+    body = _wrap_template(f"""
+      <p style="margin-top:0;">New message submitted through the TerraSense AI Contact page:</p>
+      <table role="presentation" width="100%" style="margin:14px 0;">
+        <tr><td style="color:#94a3b8;padding:4px 0;">Name</td><td style="text-align:right;color:#e2e8f0;">{name}</td></tr>
+        <tr><td style="color:#94a3b8;padding:4px 0;">Email</td><td style="text-align:right;color:#e2e8f0;">{from_email}</td></tr>
+        <tr><td style="color:#94a3b8;padding:4px 0;">Type</td><td style="text-align:right;color:#e2e8f0;">{sender_type}</td></tr>
+      </table>
+      <div style="margin-top:8px;padding:14px 16px;background:#111827;border-radius:10px;border:1px solid #1f2937;">
+        <p style="margin:0;color:#cbd5e1;font-size:13px;line-height:1.6;">{safe_message}</p>
+      </div>
+    """)
+    return _send_via_apps_script(settings.CONTACT_FORM_TO_EMAIL, subject, body)

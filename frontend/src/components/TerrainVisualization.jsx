@@ -120,6 +120,7 @@ function Scene({ hotspots, showLabels, controlsActive }) {
 export default function TerrainVisualization({
   hotspots = DEFAULT_HOTSPOTS,
   height = 360,
+  className = "",
 }) {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -165,12 +166,14 @@ export default function TerrainVisualization({
     <div
       ref={containerRef}
       style={{ height: isFullscreen ? "100vh" : height }}
-      className="relative overflow-hidden rounded-xl border border-base-700/60 bg-base-950"
+      className={`relative w-full overflow-hidden rounded-xl border border-base-700/60 bg-base-950 ${className}`}
       onClick={() => setControlsActive(true)}
     >
       <Canvas
         shadows
         dpr={[1, 1.5]}
+        style={{ width: "100%", height: "100%", display: "block" }}
+        resize={{ scroll: false }}
         camera={{ position: [0, 14, 22], fov: 45 }}
         onCreated={({ gl }) => {
           // Gracefully recover from WebGL context loss (can happen on GPU

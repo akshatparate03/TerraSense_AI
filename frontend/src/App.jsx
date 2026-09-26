@@ -23,6 +23,9 @@ import MapView from "./pages/MapView.jsx";
 import Alerts from "./pages/Alerts.jsx";
 import Locations from "./pages/Locations.jsx";
 import About from "./pages/About.jsx";
+import Terms from "./pages/Terms.jsx";
+import Privacy from "./pages/Privacy.jsx";
+import Contact from "./pages/Contact.jsx";
 
 export default function App() {
   return (
@@ -39,6 +42,11 @@ export default function App() {
         <Route path="/set-password" element={<SetPassword />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Public content pages */}
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/contact" element={<Contact />} />
 
         {/* Protected app routes - require login */}
         <Route

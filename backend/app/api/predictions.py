@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.deps import get_current_user_optional
 from app.ml.inference import ModelNotLoadedError, inference_service
 from app.schemas.schemas import LocationPredictionRequest, PredictionRequest
 from app.services import db_service
@@ -31,7 +32,11 @@ def _serialize(p) -> dict:
 
 
 @router.post("")
-async def create_prediction(payload: PredictionRequest, db: Session = Depends(get_db)):
+async def create_prediction(
+    payload: PredictionRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user_optional),
+):
     try:
         result = inference_service.predict(payload.model_dump())
     except ModelNotLoadedError as e:
@@ -51,6 +56,7 @@ async def create_prediction(payload: PredictionRequest, db: Session = Depends(ge
         model_run_id=active_model.id if active_model else None,
         prediction_result=result,
         source="manual",
+        user_id=current_user.id if current_user else None,
     )
     alert = db_service.generate_alert_if_needed(db, pred, location.name)
 
@@ -60,7 +66,11 @@ async def create_prediction(payload: PredictionRequest, db: Session = Depends(ge
 
 
 @router.post("/location")
-async def create_location_prediction(payload: LocationPredictionRequest, db: Session = Depends(get_db)):
+async def create_location_prediction(
+    payload: LocationPredictionRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user_optional),
+):
     """Primary live-analysis endpoint (spec sections 12-17, 35-36). The user
     supplies only latitude/longitude/radius -- every environmental feature is
     retrieved automatically by the geo data engine. No manual rainfall/soil
@@ -117,6 +127,7 @@ async def create_location_prediction(payload: LocationPredictionRequest, db: Ses
         model_run_id=active_model.id if active_model else None,
         prediction_result=result,
         source="live_location",
+        user_id=current_user.id if current_user else None,
     )
     alert = db_service.generate_alert_if_needed(db, pred, location.name)
 

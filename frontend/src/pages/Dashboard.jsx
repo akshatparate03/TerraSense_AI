@@ -111,28 +111,24 @@ export default function Dashboard() {
         <KpiCard
           label="Total Predictions"
           value={summary.total_predictions}
-          sub="all-time, PostgreSQL"
           accent="cyan"
           icon={Database}
         />
         <KpiCard
-          label="High Risk"
-          value={summary.high_risk_predictions}
-          sub="HIGH risk predictions"
+          label="Alerts Triggered"
+          value={summary.alerts_triggered}
           accent="rose"
           icon={AlertTriangle}
         />
         <KpiCard
           label="Active Alerts"
           value={summary.active_alerts}
-          sub="ACTIVE status"
           accent="rose"
           icon={AlertTriangle}
         />
         <KpiCard
           label="Locations Monitored"
           value={summary.monitored_locations}
-          sub={`${summary.historical_events} historical events`}
           accent="cyan"
           icon={MapPin}
         />
@@ -143,7 +139,6 @@ export default function Dashboard() {
               ? `${(summary.active_model_accuracy * 100).toFixed(1)}%`
               : "—"
           }
-          sub={summary.active_model_name || "training pending"}
           accent="emerald"
           icon={Gauge}
         />
@@ -154,11 +149,6 @@ export default function Dashboard() {
               ? new Date(summary.last_update).toLocaleTimeString()
               : "—"
           }
-          sub={
-            summary.last_update
-              ? new Date(summary.last_update).toLocaleDateString()
-              : ""
-          }
           accent="cyan"
           icon={Clock}
         />
@@ -166,10 +156,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <SectionTitle
-            title="Active Alerts"
-            subtitle="Generated from real ML predictions crossing risk thresholds, stored in PostgreSQL"
-          />
+          <SectionTitle title="Active Alerts" />
           {alerts.length === 0 ? (
             <div className="flex items-center gap-3 rounded-xl border border-dashed border-base-600 p-6 text-sm text-slate-500">
               <Activity className="h-5 w-5 text-slate-600" />
@@ -211,10 +198,7 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <SectionTitle
-            title="Landslide Size Distribution"
-            subtitle="Historical catalog (real data)"
-          />
+          <SectionTitle title="Landslide Size Distribution" />
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -248,18 +232,12 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <SectionTitle
-          title="3D Terrain Risk Visualization"
-          subtitle="Conceptual terrain rendering with animated risk hotspots — illustrative, not exact geographic terrain data"
-        />
+        <SectionTitle title="3D Terrain Risk Visualization" />
         <TerrainVisualization />
       </Card>
 
       <Card>
-        <SectionTitle
-          title="Landslide Category Frequency"
-          subtitle="Top categories across the full historical catalog"
-        />
+        <SectionTitle title="Landslide Category Frequency" />
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={categoryData}>
             <CartesianGrid

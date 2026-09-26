@@ -267,11 +267,13 @@ def record_prediction(
     model_run_id: int | None,
     prediction_result: dict,
     source: str,
+    user_id: int | None = None,
 ) -> Prediction:
     pred = Prediction(
         location_id=location_id,
         environmental_reading_id=environmental_reading_id,
         model_run_id=model_run_id,
+        user_id=user_id,
         predicted_class=1 if prediction_result["risk_level"] != "LOW" else 0,
         risk_level=prediction_result["risk_level"],
         risk_probability=prediction_result["landslide_probability"],
@@ -458,6 +460,49 @@ def analytics_overview(db: Session) -> dict:
         "active_model_version": active_model.model_version if active_model else None,
         "active_model_accuracy": active_model.accuracy if active_model else None,
         "last_update": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def user_dashboard_summary(db: Session, user_id: int) -> dict:
+    """Dashboard numbers scoped to what THIS user has actually done in their
+    own account -- excludes the shared historical catalog (11k+ events the
+    model trained on) and excludes simulation-replay predictions, since
+    neither of those represents "your" predictions."""
+    own_predictions_q = db.query(Prediction).filter(
+        Prediction.user_id == user_id,
+        Prediction.prediction_source != "simulation",
+    )
+    total_predictions = own_predictions_q.count()
+    high_risk = own_predictions_q.filter(Prediction.risk_level == "HIGH").count()
+
+    own_prediction_ids = [p.id for p in own_predictions_q.with_entities(Prediction.id)]
+    alerts_from_own_predictions = (
+        db.query(func.count(Alert.id)).filter(Alert.prediction_id.in_(own_prediction_ids)).scalar()
+        if own_prediction_ids
+        else 0
+    ) or 0
+    active_alerts = (
+        db.query(func.count(Alert.id))
+        .filter(Alert.prediction_id.in_(own_prediction_ids), Alert.status == "ACTIVE")
+        .scalar()
+        if own_prediction_ids
+        else 0
+    ) or 0
+
+    monitored_locations = db.query(func.count(Location.id)).filter(Location.is_active.is_(True)).scalar() or 0
+    active_model = get_active_model_run(db)
+    last_prediction = own_predictions_q.order_by(Prediction.timestamp.desc()).first()
+
+    return {
+        "total_predictions": total_predictions,
+        "high_risk_predictions": high_risk,
+        "alerts_triggered": alerts_from_own_predictions,
+        "active_alerts": active_alerts,
+        "monitored_locations": monitored_locations,
+        "active_model_name": active_model.model_name if active_model else None,
+        "active_model_version": active_model.model_version if active_model else None,
+        "active_model_accuracy": active_model.accuracy if active_model else None,
+        "last_update": last_prediction.timestamp.isoformat() if last_prediction else None,
     }
 
 

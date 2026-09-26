@@ -20,7 +20,7 @@ from app.services import db_service
 logger = logging.getLogger(__name__)
 
 TOTAL_SIM_RECORDS = 500
-SPEED_OPTIONS = [0.5, 1, 2, 5, 10, 50]
+SPEED_OPTIONS = [0.5, 1, 2, 5, 10, 50, 75, 100]
 
 
 class SimulationEngine:
@@ -106,6 +106,10 @@ class SimulationEngine:
                     "index": i + 1,
                     "rainfall_mm": record["rainfall_mm"],
                     "soil_moisture_pct": record["soil_moisture_pct"],
+                    "temperature_c": record["temperature_c"],
+                    "humidity_pct": record["humidity_pct"],
+                    "slope_deg": record["slope_deg"],
+                    "elevation_m": record["elevation_m"],
                     "probability": prediction["landslide_probability"] * 100 if prediction else None,
                     "risk_level": prediction["risk_level"] if prediction else None,
                 }
@@ -237,7 +241,7 @@ class SimulationEngine:
 
     def set_speed(self, speed: float):
         # snap to nearest supported option, capped at 50x
-        self.speed = max(0.25, min(50.0, speed))
+        self.speed = max(0.25, min(100.0, speed))
         return self.status()
 
     def status(self) -> dict:

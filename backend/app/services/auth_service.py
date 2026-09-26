@@ -29,8 +29,9 @@ class AuthError(Exception):
         super().__init__(message)
 
 
-def start_registration(db: Session, name: str, email: str) -> dict:
+def start_registration(db: Session, name: str, email: str, account_type: str = "individual") -> dict:
     email = email.lower().strip()
+    account_type = account_type if account_type in ("individual", "organization") else "individual"
     user = db.query(User).filter(User.email == email).first()
 
     if user and user.is_email_verified and user.password_hash:
@@ -39,10 +40,11 @@ def start_registration(db: Session, name: str, email: str) -> dict:
         )
 
     if user is None:
-        user = User(name=name, email=email, auth_provider="local", is_email_verified=False)
+        user = User(name=name, email=email, auth_provider="local", is_email_verified=False, account_type=account_type)
         db.add(user)
     else:
         user.name = name  # allow correcting name on re-attempt before verification
+        user.account_type = account_type
 
     db.commit()
     db.refresh(user)

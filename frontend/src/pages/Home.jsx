@@ -228,7 +228,7 @@ export default function Home() {
       </section>
 
       {/* ---------------- FEATURES ---------------- */}
-      <section className="relative z-10 border-t border-base-700/50 px-6 py-24">
+      <section className="relative z-10 px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="mb-14 text-center">
             <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
@@ -248,7 +248,7 @@ export default function Home() {
       </section>
 
       {/* ---------------- 3D SHOWCASE ---------------- */}
-      <section className="relative z-10 border-t border-base-700/50 px-6 py-24">
+      <section className="relative z-10 px-6 py-24">
         <div className="mx-auto max-w-5xl text-center">
           <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
             3D Terrain Risk Visualization
@@ -262,15 +262,15 @@ export default function Home() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mt-10 overflow-hidden rounded-3xl border border-base-700/60 shadow-glow"
+            className="mt-10"
           >
-            <TerrainVisualization height={460} />
+            <TerrainVisualization height={460} className="shadow-glow" />
           </motion.div>
         </div>
       </section>
 
       {/* ---------------- CTA ---------------- */}
-      <section className="relative z-10 border-t border-base-700/50 px-6 py-24">
+      <section className="relative z-10 px-6 py-24">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
             {user ? "Ready to dive back in?" : "Ready to explore the platform?"}
@@ -293,38 +293,96 @@ export default function Home() {
       </section>
 
       {/* ---------------- FOOTER ---------------- */}
-      <footer className="relative z-10 border-t border-base-700/50 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2.5">
-            <img
-              src="/TerraSense_AI_Logo.svg"
-              alt="TerraSense AI logo"
-              className="h-9 w-9 drop-shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+      <footer className="relative z-10 px-6 py-12">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+            <div className="col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/TerraSense_AI_Logo.svg"
+                  alt="TerraSense AI logo"
+                  className="h-9 w-9 drop-shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+                />
+                <span className="text-sm font-semibold text-slate-200">
+                  TerraSense AI
+                </span>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                Software-based risk intelligence platform.
+              </p>
+              <div className="mt-4 flex items-center gap-3">
+                {SOCIAL_LINKS.map((s) => (
+                  <a
+                    key={s.name}
+                    href={s.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={s.name}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-base-600 text-slate-400 transition-colors hover:border-accent-cyan/50 hover:text-accent-cyan"
+                  >
+                    <s.icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <FooterColumn
+              title="Platform"
+              links={[
+                ["Dashboard", "/dashboard"],
+                ["Live Risk Scan", "/monitoring"],
+                ["Risk Prediction", "/predict"],
+                ["Simulation Archive", "/simulation-archive"],
+                ["ML Model", "/model"],
+              ]}
             />
-            <span className="text-sm font-semibold text-slate-200">
-              TerraSense AI
-            </span>
+            <FooterColumn
+              title="Intelligence"
+              links={[
+                ["Analytics", "/analytics"],
+                ["Historical Events", "/historical"],
+                ["Locations / Map", "/map"],
+                ["Alerts", "/alerts"],
+                ["About System", "/about"],
+              ]}
+            />
+            <FooterColumn
+              title="Company"
+              links={[
+                ["Contact Us", "/contact"],
+                ["Privacy Policy", "/privacy"],
+                ["Terms & Conditions", "/terms"],
+              ]}
+            />
           </div>
-          <p className="text-center text-xs text-slate-600 sm:text-left">
-            Software-based risk intelligence platform. Not a certified emergency
-            warning service.
-          </p>
-          <div className="flex items-center gap-3">
-            {SOCIAL_LINKS.map((s) => (
-              <a
-                key={s.name}
-                href={s.href}
-                target="_blank"
-                rel="noreferrer"
-                title={s.name}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-base-600 text-slate-400 transition-colors hover:border-accent-cyan/50 hover:text-accent-cyan"
-              >
-                <s.icon className="h-4 w-4" />
-              </a>
-            ))}
+
+          <div className="mt-10 pt-6 text-center text-[11px] text-slate-600">
+            © {new Date().getFullYear()} TerraSense AI. All rights reserved.
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FooterColumn({ title, links }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        {title}
+      </p>
+      <ul className="mt-3 space-y-2">
+        {links.map(([label, href]) => (
+          <li key={href}>
+            <Link
+              to={href}
+              className="text-xs text-slate-500 transition-colors hover:text-accent-cyan"
+            >
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

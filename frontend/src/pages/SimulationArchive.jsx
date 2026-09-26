@@ -31,7 +31,7 @@ import {
   Brush,
 } from "recharts";
 
-const SPEEDS = [0.5, 1, 2, 5, 10, 50];
+const SPEEDS = [0.5, 1, 2, 5, 10, 50, 75, 100];
 const MAX_LIVE_POINTS = 40;
 
 export default function SimulationArchive() {
@@ -69,6 +69,10 @@ export default function SimulationArchive() {
             t: msg.index,
             rainfall: msg.observation.rainfall_mm,
             soil: msg.observation.soil_moisture_pct,
+            temperature: msg.observation.temperature_c,
+            humidity: msg.observation.humidity_pct,
+            slope: msg.observation.slope_deg,
+            elevation: msg.observation.elevation_m,
             probability: (msg.prediction.landslide_probability || 0) * 100,
           },
         ];
@@ -84,11 +88,10 @@ export default function SimulationArchive() {
     simulationFullHistory().then((d) => setFullHistory(d.items));
   };
 
-  useEffect(() => {
-    // Load the full 1-500 record chart once on mount too, so it's browsable
-    // even before starting a fresh run.
-    loadFullHistory();
-  }, []);
+  // Intentionally NOT loaded on mount: the "Full Simulation Run" chart only
+  // appears once a run has actually completed all 500 records (see the
+  // "simulation_completed" websocket handler above and reset() below),
+  // instead of showing pre-baked data before the user has run anything.
 
   const start = async () => {
     const status = await simulationStart(speed);
@@ -113,6 +116,7 @@ export default function SimulationArchive() {
     const s = await simulationReset();
     setSeries([]);
     setLatest(null);
+    setFullHistory(null);
     setRunning(s.is_running);
     setPaused(s.is_paused);
     setCompleted(s.completed);
@@ -136,9 +140,7 @@ export default function SimulationArchive() {
           </h1>
           <p className="text-sm text-slate-500">
             Replays 500 real historical catalog records through the model —
-            useful for exploring how it behaves, NOT a live risk feed. For
-            current risk at real locations, see{" "}
-            <span className="text-accent-cyan">Live Risk Scan</span>.
+            useful for exploring how it behaves.
           </p>
         </div>
         <Badge color={completed ? "emerald" : "cyan"}>
@@ -197,7 +199,7 @@ export default function SimulationArchive() {
           >
             <RotateCcw className="h-4 w-4" /> Reset
           </button>
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto">
             <span className="text-xs text-slate-500 mr-1">Speed</span>
             {SPEEDS.map((s) => (
               <button
@@ -271,10 +273,10 @@ export default function SimulationArchive() {
 
         <Card className="lg:col-span-2">
           <SectionTitle
-            title="Live Probability & Rainfall Trend"
-            subtitle="Last 40 ticks of the current run"
+            title="Simulation Trend — All Signals"
+            subtitle="Last 40 ticks of the current replay run — this replays historical catalog records, it is not a live feed"
           />
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={320}>
             <LineChart data={series}>
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -287,7 +289,19 @@ export default function SimulationArchive() {
                 fontSize={11}
                 tickLine={false}
               />
-              <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+              <YAxis
+                yAxisId="left"
+                stroke="#64748b"
+                fontSize={11}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#64748b"
+                fontSize={11}
+                tickLine={false}
+              />
               <Tooltip
                 contentStyle={{
                   background: "#0d1117",
@@ -297,14 +311,7 @@ export default function SimulationArchive() {
               />
               <Legend />
               <Line
-                type="monotone"
-                dataKey="probability"
-                name="Probability %"
-                stroke="#f43f5e"
-                dot={false}
-                strokeWidth={2}
-              />
-              <Line
+                yAxisId="right"
                 type="monotone"
                 dataKey="rainfall"
                 name="Rainfall mm"
@@ -313,10 +320,56 @@ export default function SimulationArchive() {
                 strokeWidth={2}
               />
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="soil"
                 name="Soil Moisture %"
                 stroke="#34d399"
+                dot={false}
+                strokeWidth={2}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="temperature"
+                name="Temperature °C"
+                stroke="#fbbf24"
+                dot={false}
+                strokeWidth={2}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="humidity"
+                name="Humidity %"
+                stroke="#a78bfa"
+                dot={false}
+                strokeWidth={2}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="slope"
+                name="Slope °"
+                stroke="#fb923c"
+                dot={false}
+                strokeWidth={2}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="elevation"
+                name="Elevation m"
+                stroke="#eab308"
+                dot={false}
+                strokeWidth={2}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="probability"
+                name="Probability %"
+                stroke="#f43f5e"
                 dot={false}
                 strokeWidth={2}
               />
@@ -328,9 +381,15 @@ export default function SimulationArchive() {
       <Card>
         <SectionTitle
           title="Full Simulation Run (Records 1–500)"
-          subtitle="Scroll / drag the selector below the chart to browse the entire run — hover any point to see rainfall, soil moisture and probability together"
+          subtitle="Scroll / drag the selector below the chart to browse the entire run — hover any point to see all signals together"
         />
-        {!fullHistory ? (
+        {!completed ? (
+          <p className="text-sm text-slate-500">
+            This chart fills in once a full run finishes all 500 records —
+            press Start above and let it play through (use a higher speed to
+            get there faster).
+          </p>
+        ) : !fullHistory ? (
           <p className="text-sm text-slate-500">Loading full run...</p>
         ) : (
           <ResponsiveContainer width="100%" height={380}>
@@ -353,7 +412,19 @@ export default function SimulationArchive() {
                   fontSize: 11,
                 }}
               />
-              <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+              <YAxis
+                yAxisId="left"
+                stroke="#64748b"
+                fontSize={11}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#64748b"
+                fontSize={11}
+                tickLine={false}
+              />
               <Tooltip
                 contentStyle={{
                   background: "#0d1117",
@@ -364,6 +435,7 @@ export default function SimulationArchive() {
               />
               <Legend />
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="probability"
                 name="Probability %"
@@ -373,6 +445,7 @@ export default function SimulationArchive() {
                 isAnimationActive={false}
               />
               <Line
+                yAxisId="right"
                 type="monotone"
                 dataKey="rainfall_mm"
                 name="Rainfall mm"
@@ -382,10 +455,51 @@ export default function SimulationArchive() {
                 isAnimationActive={false}
               />
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="soil_moisture_pct"
                 name="Soil Moisture %"
                 stroke="#34d399"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="temperature_c"
+                name="Temperature °C"
+                stroke="#fbbf24"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="humidity_pct"
+                name="Humidity %"
+                stroke="#a78bfa"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="slope_deg"
+                name="Slope °"
+                stroke="#fb923c"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="elevation_m"
+                name="Elevation m"
+                stroke="#eab308"
                 dot={false}
                 strokeWidth={1.5}
                 isAnimationActive={false}

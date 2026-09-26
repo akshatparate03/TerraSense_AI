@@ -6,14 +6,17 @@ import logging
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api import alerts, analytics_api, global_scan, health, landslide_events, locations, models_api, monitoring, predictions
 from app.api.auth import router as auth_router
 from app.core.config import settings
-from app.core.database import SessionLocal, get_db
+from app.core.database import SessionLocal, engine, get_db
+from app.core.deps import get_current_user
 from app.ml.inference import inference_service
 from app.services import db_service, global_scan_service, history_service, monitoring_service
+from app.services.email_service import send_contact_form_email
 from app.simulation.engine import simulation_engine
 
 logging.basicConfig(level=settings.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -54,6 +57,31 @@ app.include_router(global_scan.router)
 app.include_router(landslide_events.router)
 app.include_router(models_api.router)
 app.include_router(analytics_api.router)
+
+
+# ---------------------------------------------------------------------------
+# Public "Contact Us" form -- no auth required, forwards to the configured
+# inbox via the same Apps Script webhook used for OTP/reset/alert emails.
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel, EmailStr, Field  # noqa: E402
+
+
+class ContactRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    email: EmailStr
+    sender_type: str = Field(default="individual", pattern="^(individual|organization)$")
+    message: str = Field(..., min_length=10, max_length=4000)
+
+
+@app.post("/api/contact")
+async def submit_contact_form(payload: ContactRequest):
+    delivered = send_contact_form_email(payload.name, payload.email, payload.sender_type, payload.message)
+    if not delivered:
+        # Not configured / delivery failed -- still return success-shaped
+        # info to the caller but flag it so the frontend can decide how to
+        # message it; message content itself was already logged server-side.
+        return {"ok": True, "delivered": False}
+    return {"ok": True, "delivered": True}
 
 
 # ---------------------------------------------------------------------------
@@ -105,10 +133,10 @@ async def dataset_correlation_matrix():
 # Dashboard summary (DB-backed)
 # ---------------------------------------------------------------------------
 @app.get("/api/dashboard/summary")
-async def dashboard_summary(db: Session = Depends(get_db)):
+async def dashboard_summary(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     from app.services import db_service
 
-    return db_service.analytics_overview(db)
+    return db_service.user_dashboard_summary(db, current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +171,7 @@ async def dataset_locations(limit: int = Query(300, le=1000)):
 # Simulation controls
 # ---------------------------------------------------------------------------
 @app.post("/api/simulation/start")
-async def simulation_start(speed: float = Query(1.0, ge=0.25, le=50)):
+async def simulation_start(speed: float = Query(1.0, ge=0.25, le=100)):
     return simulation_engine.start(speed=speed)
 
 
@@ -168,7 +196,7 @@ async def simulation_reset():
 
 
 @app.post("/api/simulation/speed")
-async def simulation_speed(speed: float = Query(..., ge=0.25, le=50)):
+async def simulation_speed(speed: float = Query(..., ge=0.25, le=100)):
     return simulation_engine.set_speed(speed)
 
 
@@ -253,6 +281,30 @@ async def _run_monitoring_job():
         logger.error(f"Scheduled monitoring cycle failed: {e}")
     finally:
         db.close()
+
+
+@app.on_event("startup")
+async def _ensure_schema_additions():
+    """Idempotent safety net for small additive schema changes that ship
+    outside the normal Alembic migration flow (e.g. this build's new
+    `users.account_type` column). Postgres supports ADD COLUMN IF NOT
+    EXISTS, so this is a no-op on every restart once the column exists."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "account_type VARCHAR(20) NOT NULL DEFAULT 'individual'"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                )
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Schema safety-net check skipped/failed (non-fatal): {e}")
 
 
 @app.on_event("startup")

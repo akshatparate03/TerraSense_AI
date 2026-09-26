@@ -39,7 +39,7 @@ async def password_rules():
 
 @router.post("/register")
 async def register(payload: RegisterStartRequest, db: Session = Depends(get_db)):
-    return _handle(auth_service.start_registration, db, payload.name, payload.email)
+    return _handle(auth_service.start_registration, db, payload.name, payload.email, payload.account_type)
 
 
 @router.post("/verify-otp")

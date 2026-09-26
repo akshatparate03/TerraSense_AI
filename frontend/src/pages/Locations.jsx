@@ -72,7 +72,7 @@ export default function Locations() {
         <div>
           <h1 className="text-xl font-bold text-slate-50">Manage Locations</h1>
           <p className="text-sm text-slate-500">
-            Monitoring locations, persisted in PostgreSQL (locations table)
+            Locations you're actively monitoring for landslide risk
           </p>
         </div>
         <button

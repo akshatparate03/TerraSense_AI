@@ -71,6 +71,11 @@ class Settings:
     # See README "Email via Google Apps Script" section for setup instructions.
     APPS_SCRIPT_EMAIL_URL: str = os.getenv("APPS_SCRIPT_EMAIL_URL", "")
     APPS_SCRIPT_SHARED_SECRET: str = os.getenv("APPS_SCRIPT_SHARED_SECRET", "")
+    # Destination inbox for the public "Contact Us" form. Set this to your
+    # own email in the environment -- it defaults to empty, which just logs
+    # the message instead of sending (same fallback behavior as OTP emails
+    # when APPS_SCRIPT_EMAIL_URL isn't configured yet).
+    CONTACT_FORM_TO_EMAIL: str = os.getenv("CONTACT_FORM_TO_EMAIL", "")
 
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 

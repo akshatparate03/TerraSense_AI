@@ -497,6 +497,7 @@ values. Summary:
 | `JWT_SECRET` | backend | Signs session tokens |
 | `GOOGLE_CLIENT_ID` | backend **and** frontend (`VITE_GOOGLE_CLIENT_ID`) | Must be the **same** value in both |
 | `APPS_SCRIPT_EMAIL_URL` / `APPS_SCRIPT_SHARED_SECRET` | backend | Real email delivery for OTP/reset **and** landslide risk alerts (Phase 3) |
+| `CONTACT_FORM_TO_EMAIL` | backend | Inbox that receives messages submitted through the public Contact page (reuses the same Apps Script webhook) |
 | `CORS_ORIGINS` / `FRONTEND_URL` | backend | Set to `localhost:5173` for local dev |
 | `MOCK_EXTERNAL_APIS` | backend | `true` = offline demo data for live-location prediction (no internet needed) |
 | `MONITORING_ENABLED` / `MONITORING_INTERVAL_MINUTES` | backend | Background email-alert worker on/off + check frequency |

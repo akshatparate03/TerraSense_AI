@@ -145,6 +145,7 @@ class Prediction(Base):
         ForeignKey("environmental_readings.id", ondelete="SET NULL")
     )
     model_run_id: Mapped[int | None] = mapped_column(ForeignKey("model_runs.id", ondelete="SET NULL"))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     predicted_class: Mapped[int] = mapped_column(Integer, nullable=False)  # 1 = landslide, 0 = no landslide
@@ -235,6 +236,9 @@ class User(Base):
     uuid: Mapped[str] = mapped_column(String(36), default=lambda: str(uuid.uuid4()), unique=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    # 'individual' | 'organization' -- collected at registration, purely
+    # informational (doesn't gate access to anything).
+    account_type: Mapped[str] = mapped_column(String(20), default="individual")
     password_hash: Mapped[str | None] = mapped_column(String(255))  # null for Google-only accounts
     auth_provider: Mapped[str] = mapped_column(String(20), default="local")  # 'local' | 'google'
     google_sub: Mapped[str | None] = mapped_column(String(120), unique=True)

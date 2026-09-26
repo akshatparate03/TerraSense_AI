@@ -37,7 +37,7 @@ const NAV = [
 
 function SidebarBrand() {
   return (
-    <Link to="/" className="flex items-center gap-2.5 px-5 py-6">
+    <Link to="/" className="flex items-center gap-2.5 px-5 py-4">
       <img
         src="/TerraSense_AI_Logo.svg"
         alt="TerraSense AI logo"
@@ -47,8 +47,10 @@ function SidebarBrand() {
         <p className="truncate text-sm font-bold leading-tight tracking-wide text-slate-100">
           TerraSense AI
         </p>
-        <p className="truncate text-[10px] font-medium leading-tight tracking-wider text-accent-cyan">
-          Sense the Earth. Predict the Risk.
+        <p className="text-[10px] font-medium leading-tight tracking-wider text-accent-cyan">
+          Sense the Earth.
+          <br />
+          Predict the Risk.
         </p>
       </div>
     </Link>
@@ -57,7 +59,7 @@ function SidebarBrand() {
 
 function SidebarNav({ onNavigate }) {
   return (
-    <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+    <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
       {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
@@ -65,7 +67,7 @@ function SidebarNav({ onNavigate }) {
           end={to === "/dashboard" || to === "/"}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+            `flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
               isActive
                 ? "bg-accent-cyan/10 text-accent-cyan"
                 : "text-slate-400 hover:bg-base-800 hover:text-slate-200"
@@ -100,7 +102,6 @@ function SidebarFooter({ user, logout }) {
       </div>
       <p className="text-center text-[10px] leading-snug text-slate-600">
         Software-based risk intelligence platform.
-        <br /> Not a certified emergency warning service.
       </p>
     </div>
   );

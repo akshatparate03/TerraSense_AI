@@ -85,7 +85,6 @@ export default function AnimatedBackground({ variant = 'full' }) {
       <div className="orb orb-blue" />
       {variant === 'full' && <div className="orb orb-emerald" />}
       <div className="absolute inset-0 bg-grid-lines opacity-[0.15]" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-base-950" />
     </div>
   )
 }

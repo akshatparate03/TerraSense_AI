@@ -30,7 +30,13 @@ function formatFeature(key) {
 
 function DataStatusPill({ status }) {
   const color =
-    status === "LIVE" ? "emerald" : status === "CACHED" ? "cyan" : status === "DEMO" ? "amber" : "rose";
+    status === "LIVE"
+      ? "emerald"
+      : status === "CACHED"
+      ? "cyan"
+      : status === "DEMO" || status === "ESTIMATED"
+      ? "amber"
+      : "rose";
   return <Badge color={color}>{status || "UNKNOWN"}</Badge>;
 }
 
@@ -166,21 +172,35 @@ export default function Predict() {
   };
 
   // --- Manual (legacy) mode state ---
+  // Fields start EMPTY (not pre-filled with the default) so the input can
+  // actually be cleared/edited normally -- the `default` is only shown as
+  // a placeholder and used as the fallback value at submit time.
   const [form, setForm] = useState(
-    Object.fromEntries(MANUAL_FIELDS.map((f) => [f.key, f.default])),
+    Object.fromEntries(MANUAL_FIELDS.map((f) => [f.key, ""])),
   );
   const [triggerHint, setTriggerHint] = useState("rain");
   const [manualResult, setManualResult] = useState(null);
   const [manualLoading, setManualLoading] = useState(false);
   const [manualError, setManualError] = useState(null);
 
-  const updateManual = (key, val) => setForm((f) => ({ ...f, [key]: Number(val) }));
+  // Keep the raw string in state (never coerce to Number here) so the
+  // input can be fully cleared -- coercing empty string to 0 immediately
+  // is what caused the "stuck 0" bug.
+  const updateManual = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const submitManual = async () => {
     setManualLoading(true);
     setManualError(null);
     try {
-      const res = await postPredict({ ...form, trigger_hint: triggerHint });
+      const payload = Object.fromEntries(
+        MANUAL_FIELDS.map((f) => [
+          f.key,
+          form[f.key] === "" || form[f.key] === null || form[f.key] === undefined
+            ? f.default
+            : Number(form[f.key]),
+        ]),
+      );
+      const res = await postPredict({ ...payload, trigger_hint: triggerHint });
       setManualResult(res);
     } catch (e) {
       setManualError(e.response?.data?.detail || e.message);
@@ -283,8 +303,9 @@ export default function Predict() {
                     max={f.max}
                     step={f.step}
                     value={form[f.key]}
+                    placeholder={String(f.default)}
                     onChange={(e) => updateManual(f.key, e.target.value)}
-                    className="w-full rounded-lg border border-base-600 bg-base-800/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-accent-cyan/50"
+                    className="w-full rounded-lg border border-base-600 bg-base-800/60 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-accent-cyan/50"
                   />
                 </div>
               ))}

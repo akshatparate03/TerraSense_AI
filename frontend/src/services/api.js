@@ -39,8 +39,8 @@ api.interceptors.response.use(
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
-export const authRegister = (name, email) =>
-  api.post("/auth/register", { name, email }).then((r) => r.data);
+export const authRegister = (name, email, accountType = "individual") =>
+  api.post("/auth/register", { name, email, account_type: accountType }).then((r) => r.data);
 export const authVerifyOtp = (email, otp) =>
   api.post("/auth/verify-otp", { email, otp }).then((r) => r.data);
 export const authResendOtp = (email) =>
@@ -231,3 +231,6 @@ export const wsLiveScanUrl = () => {
 };
 
 export default api;
+
+export const submitContactForm = (payload) =>
+  api.post("/contact", payload).then((r) => r.data);

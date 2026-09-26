@@ -172,7 +172,7 @@ export default function LiveGlobalScan() {
       </Card>
 
       <Card>
-        <SectionTitle title="Results — Highest Risk First" subtitle="Real locations, real live data" />
+        <SectionTitle title="Results — Highest Risk First" />
         {!results && !scanning && (
           <p className="flex items-center gap-2 text-sm text-slate-500">
             <Globe2 className="h-4 w-4" /> Click "Start Live Scan" to check current risk at every watchlist location.

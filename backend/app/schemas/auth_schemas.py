@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, Field
 class RegisterStartRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=150)
     email: EmailStr
+    account_type: str = Field(default="individual", pattern="^(individual|organization)$")
 
 
 class VerifyOtpRequest(BaseModel):
@@ -45,6 +46,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+    account_type: str = "individual"
     auth_provider: str
     is_email_verified: bool
 

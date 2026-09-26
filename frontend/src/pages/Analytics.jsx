@@ -98,7 +98,7 @@ export default function Analytics() {
       <Card>
         <SectionTitle
           title="Seasonal / Monthly Trend"
-          subtitle="Real event dates from the catalog"
+          subtitle="Number of recorded landslide events per calendar month, aggregated across the full NASA Global Landslide Catalog (1988–2017)"
         />
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={monthly}>
@@ -196,7 +196,7 @@ export default function Analytics() {
       <Card>
         <SectionTitle
           title="Feature Correlation Heatmap"
-          subtitle="Training feature set (real + documented simulated features) — interactive, hover any cell"
+          subtitle="Training feature set — hover any cell"
         />
         {correlation ? (
           <InteractiveCorrelationHeatmap data={correlation} />
