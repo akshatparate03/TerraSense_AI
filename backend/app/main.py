@@ -139,6 +139,19 @@ async def dashboard_summary(db: Session = Depends(get_db), current_user=Depends(
     return db_service.user_dashboard_summary(db, current_user.id)
 
 
+@app.get("/api/stats/public")
+async def public_stats(db: Session = Depends(get_db)):
+    """Public, unauthenticated landing-page stats (Home page) -- the full
+    historical catalog size, total monitored locations, and active model
+    accuracy. Not user-scoped (there is no logged-in user on the public
+    Home page). This is intentionally the OLD analytics_overview() shape;
+    /api/dashboard/summary (above) is the per-user version for the
+    authenticated Dashboard page."""
+    from app.services import db_service
+
+    return db_service.analytics_overview(db)
+
+
 # ---------------------------------------------------------------------------
 # Dataset-wide EDA endpoints (read directly from the source CSV catalog - used
 # by the Analytics page for descriptive statistics over the FULL catalog,

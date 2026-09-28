@@ -14,7 +14,7 @@ import {
 import AnimatedBackground from "../components/AnimatedBackground.jsx";
 import TerrainVisualization from "../components/TerrainVisualization.jsx";
 import Seo from "../components/Seo.jsx";
-import { getDashboardSummary } from "../services/api.js";
+import { getPublicStats } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const FEATURES = [
@@ -61,7 +61,7 @@ export default function Home() {
   const { user } = useAuth();
 
   useEffect(() => {
-    getDashboardSummary()
+    getPublicStats()
       .then(setStats)
       .catch(() => {});
   }, []);
@@ -258,11 +258,11 @@ export default function Home() {
             hotspots. Click once to activate, then drag to rotate.
           </p>
           <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 1, y: 16 }}
+            whileInView={{ y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mt-10"
+            className="relative mt-10"
           >
             <TerrainVisualization height={460} className="shadow-glow" />
           </motion.div>
@@ -401,8 +401,8 @@ function StatBlock({ value, label }) {
 function FeatureCard({ feature: f, index }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 1, y: 24 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.45, delay: index * 0.06 }}
       whileHover={{ y: -6 }}

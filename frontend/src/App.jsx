@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
+import ScrollProgressBar from "./components/ScrollProgressBar.jsx";
 
 import Home from "./pages/Home.jsx";
 import Login from "./pages/auth/Login.jsx";
@@ -31,6 +32,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
+      <ScrollProgressBar />
       <Routes>
         {/* Public landing page - the site's main entry point, no login required */}
         <Route path="/" element={<Home />} />

@@ -172,7 +172,14 @@ export default function TerrainVisualization({
       <Canvas
         shadows
         dpr={[1, 1.5]}
-        style={{ width: "100%", height: "100%", display: "block" }}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          display: "block",
+        }}
         resize={{ scroll: false }}
         camera={{ position: [0, 14, 22], fov: 45 }}
         onCreated={({ gl }) => {

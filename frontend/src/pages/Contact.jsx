@@ -42,6 +42,7 @@ export default function Contact() {
       eyebrow="Get in Touch"
       title="Contact Us"
       subtitle="Questions, feedback, or a bug to report — send us a message."
+      compact
     >
       <Seo description="Contact TerraSense AI." />
 
@@ -61,8 +62,8 @@ export default function Contact() {
           </p>
         </motion.div>
       ) : (
-        <form onSubmit={submit} className="space-y-3.5">
-          <div className="grid gap-3.5 sm:grid-cols-2">
+        <form onSubmit={submit} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
                 Full Name
@@ -123,7 +124,7 @@ export default function Contact() {
               required
               minLength={10}
               maxLength={4000}
-              rows={4}
+              rows={3}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Tell us what's on your mind..."

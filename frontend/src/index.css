@@ -7,6 +7,19 @@ body,
 #root {
   height: 100%;
 }
+/* Only on body: it propagates to the viewport, so horizontal overflow is
+   clipped without turning html/#root into nested scroll containers. */
+body {
+  overflow-x: hidden;
+}
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 body {
   @apply bg-base-950 text-slate-200 antialiased;
   background-image: radial-gradient(
@@ -14,6 +27,12 @@ body {
     rgba(34, 211, 238, 0.1),
     transparent 60%
   );
+  /* html/body are only one viewport tall, so a repeating tile would restart
+     this glow every screen-height while scrolling (visible bands). Pin it to
+     the viewport and never repeat. */
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: 100% 100%;
 }
 
 ::-webkit-scrollbar {

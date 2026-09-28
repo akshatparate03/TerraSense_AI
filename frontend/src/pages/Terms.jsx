@@ -7,8 +7,8 @@ import PublicPageShell from "../components/PublicPageShell.jsx";
 function Section({ number, title, children }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 1, y: 20 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.5 }}
       className="group relative mb-8 pl-14 last:mb-0"

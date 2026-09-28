@@ -43,8 +43,8 @@ const TEAM = [
 function FadeIn({ children, delay = 0, y = 24, className = "" }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 1, y }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.6, delay }}
       className={className}
@@ -211,12 +211,12 @@ export default function About() {
   const { user } = useAuth();
 
   return (
-    <div className="relative -m-3 min-h-screen overflow-x-hidden sm:-m-4 md:-m-8">
+    <div className="relative -m-3 min-h-screen overflow-x-clip sm:-m-4 md:-m-8">
       <Seo description="Inside TerraSense AI — an Earth-observation and machine-learning platform combining remote sensing, geospatial intelligence and predictive analytics to assess landslide risk." />
 
       {/* ================= HERO ================= */}
-      <section className="relative z-10 flex min-h-[92vh] flex-col justify-center overflow-hidden px-6 py-20">
-        <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2">
+      <section className="relative z-10 flex flex-col justify-center px-6 py-16 lg:min-h-[92vh] lg:py-20">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-2 [&>*]:min-w-0">
           <div>
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -283,7 +283,7 @@ export default function About() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.55 }}
-              className="mt-10 grid max-w-md grid-cols-3 gap-4 pt-6"
+              className="mt-10 grid max-w-md grid-cols-1 gap-4 pt-6 sm:grid-cols-3"
             >
               <StatChip value="5" label="ML models compared" />
               <StatChip value="1988–2017" label="Catalog span" />

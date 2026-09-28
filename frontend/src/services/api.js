@@ -79,6 +79,8 @@ export const authPasswordRules = () =>
 // ---------------------------------------------------------------------------
 export const getDashboardSummary = () =>
   api.get("/dashboard/summary").then((r) => r.data);
+export const getPublicStats = () =>
+  api.get("/stats/public").then((r) => r.data);
 export const getAnalyticsOverview = () =>
   api.get("/analytics/overview").then((r) => r.data);
 export const getRiskDistribution = () =>
