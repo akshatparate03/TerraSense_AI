@@ -1,69 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  BrainCircuit,
-  Database,
-  Radio,
-  ShieldCheck,
-  BarChart3,
-  Map as MapIcon,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import AnimatedBackground from "../components/AnimatedBackground.jsx";
 import TerrainVisualization from "../components/TerrainVisualization.jsx";
+import LiveRiskScanSection from "../components/LiveRiskScanSection.jsx";
+import Footer from "../components/Footer.jsx";
 import Seo from "../components/Seo.jsx";
-import { getPublicStats } from "../services/api.js";
+import { getPublicStats, getRecentLandslides } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-
-const FEATURES = [
-  {
-    icon: BrainCircuit,
-    title: "Real Machine Learning",
-    desc: "5 candidate models trained and compared on real historical data — Logistic Regression, Decision Tree, Random Forest, Gradient Boosting, and XGBoost. No hardcoded metrics.",
-  },
-  {
-    icon: Database,
-    title: "PostgreSQL Backed",
-    desc: "Every prediction, alert, reading, and model version is persisted with full relational integrity and a complete audit trail.",
-  },
-  {
-    icon: Radio,
-    title: "Historical Data Simulation",
-    desc: "A live monitoring feed replays real catalog records with adjustable playback speed up to 50x.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Early Warning Alerts",
-    desc: "Automatic alerts generated the moment a real prediction crosses a risk threshold, with a full acknowledgement workflow.",
-  },
-  {
-    icon: BarChart3,
-    title: "Deep Analytics",
-    desc: "Explore seasonal trends, feature correlations, and model performance across the full landslide catalog.",
-  },
-  {
-    icon: MapIcon,
-    title: "Interactive Risk Map",
-    desc: "Visualize real historical landslide events and monitored locations on an interactive map.",
-  },
-];
-
-const SOCIAL_LINKS = [
-  { name: "GitHub", href: "#", icon: GithubIcon },
-  { name: "Instagram", href: "#", icon: InstagramIcon },
-  { name: "Telegram", href: "#", icon: TelegramIcon },
-];
 
 export default function Home() {
   const [stats, setStats] = useState(null);
+  const [landslides, setLandslides] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
     getPublicStats()
       .then(setStats)
       .catch(() => {});
+    getRecentLandslides()
+      .then(setLandslides)
+      .catch(() => setLandslides({ points: [], note: "" }));
   }, []);
 
   return (
@@ -227,35 +185,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------------- FEATURES ---------------- */}
-      <section className="relative z-10 px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-14 text-center">
-            <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
-              A Complete Risk Intelligence Platform
-            </h2>
-            <p className="mt-3 text-slate-500">
-              Every number you see comes from a real trained model or a real
-              database query.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f, i) => (
-              <FeatureCard key={f.title} feature={f} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ---------------- 3D SHOWCASE ---------------- */}
       <section className="relative z-10 px-6 py-24">
         <div className="mx-auto max-w-5xl text-center">
           <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
-            3D Terrain Risk Visualization
+            Worldwide Landslides — Last 12 Months
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-slate-500">
-            An interactive terrain rendering with animated, labeled risk
-            hotspots. Click once to activate, then drag to rotate.
+          <p className="mx-auto mt-3 max-w-2xl text-slate-500">
+            Every point is a reported landslide, placed on the terrain by its
+            real location. Green = low impact, yellow = medium, red = high
+            (fatalities or large slides). Click once to activate, then drag to
+            rotate.
           </p>
           <motion.div
             initial={{ opacity: 1, y: 16 }}
@@ -264,10 +204,55 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="relative mt-10"
           >
-            <TerrainVisualization height={460} className="shadow-glow" />
+            <TerrainVisualization
+              points={
+                landslides
+                  ? landslides.points.map((p) => ({
+                      id: p.id,
+                      name: `${p.name}${p.country && p.country !== "unknown" ? `, ${p.country}` : ""}`,
+                      latitude: p.latitude,
+                      longitude: p.longitude,
+                      level: p.level,
+                    }))
+                  : []
+              }
+              emptyMessage={
+                landslides
+                  ? "No landslide data available right now."
+                  : "Loading landslide data..."
+              }
+              height={460}
+              className="shadow-glow"
+            />
           </motion.div>
+          {landslides?.window_start && (
+            <div className="mx-auto mt-4 max-w-2xl space-y-1 text-xs text-slate-500">
+              <p>
+                <span className="font-semibold text-rose-400">
+                  {landslides.counts.HIGH.toLocaleString()} high
+                </span>
+                {" · "}
+                <span className="font-semibold text-amber-400">
+                  {landslides.counts.MEDIUM.toLocaleString()} medium
+                </span>
+                {" · "}
+                <span className="font-semibold text-emerald-400">
+                  {landslides.counts.LOW.toLocaleString()} low
+                </span>
+                {" — "}
+                {landslides.total_events.toLocaleString()} events
+                {landslides.shown < landslides.total_events &&
+                  `, showing a representative ${landslides.shown.toLocaleString()}`}
+              </p>
+              <p>{landslides.note}</p>
+              <p className="text-slate-600">Source: {landslides.source}</p>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* ---------------- LIVE RISK SCAN (moved here from its own page) ---------------- */}
+      <LiveRiskScanSection />
 
       {/* ---------------- CTA ---------------- */}
       <section className="relative z-10 px-6 py-24">
@@ -293,96 +278,7 @@ export default function Home() {
       </section>
 
       {/* ---------------- FOOTER ---------------- */}
-      <footer className="relative z-10 px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
-            <div className="col-span-2 sm:col-span-1">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="/TerraSense_AI_Logo.svg"
-                  alt="TerraSense AI logo"
-                  className="h-9 w-9 drop-shadow-[0_0_10px_rgba(34,211,238,0.4)]"
-                />
-                <span className="text-sm font-semibold text-slate-200">
-                  TerraSense AI
-                </span>
-              </div>
-              <p className="mt-3 text-xs leading-relaxed text-slate-600">
-                Software-based risk intelligence platform.
-              </p>
-              <div className="mt-4 flex items-center gap-3">
-                {SOCIAL_LINKS.map((s) => (
-                  <a
-                    key={s.name}
-                    href={s.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={s.name}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-base-600 text-slate-400 transition-colors hover:border-accent-cyan/50 hover:text-accent-cyan"
-                  >
-                    <s.icon className="h-4 w-4" />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            <FooterColumn
-              title="Platform"
-              links={[
-                ["Dashboard", "/dashboard"],
-                ["Live Risk Scan", "/monitoring"],
-                ["Risk Prediction", "/predict"],
-                ["Simulation Archive", "/simulation-archive"],
-                ["ML Model", "/model"],
-              ]}
-            />
-            <FooterColumn
-              title="Intelligence"
-              links={[
-                ["Analytics", "/analytics"],
-                ["Historical Events", "/historical"],
-                ["Locations / Map", "/map"],
-                ["Alerts", "/alerts"],
-                ["About System", "/about"],
-              ]}
-            />
-            <FooterColumn
-              title="Company"
-              links={[
-                ["Contact Us", "/contact"],
-                ["Privacy Policy", "/privacy"],
-                ["Terms & Conditions", "/terms"],
-              ]}
-            />
-          </div>
-
-          <div className="mt-10 pt-6 text-center text-[11px] text-slate-600">
-            © {new Date().getFullYear()} TerraSense AI. All rights reserved.
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function FooterColumn({ title, links }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-        {title}
-      </p>
-      <ul className="mt-3 space-y-2">
-        {links.map(([label, href]) => (
-          <li key={href}>
-            <Link
-              to={href}
-              className="text-xs text-slate-500 transition-colors hover:text-accent-cyan"
-            >
-              {label}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <Footer />
     </div>
   );
 }
@@ -395,68 +291,5 @@ function StatBlock({ value, label }) {
       </p>
       <p className="mt-1 text-xs text-slate-500">{label}</p>
     </div>
-  );
-}
-
-function FeatureCard({ feature: f, index }) {
-  return (
-    <motion.div
-      initial={{ opacity: 1, y: 24 }}
-      whileInView={{ y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.45, delay: index * 0.06 }}
-      whileHover={{ y: -6 }}
-      className="glass group relative overflow-hidden rounded-2xl p-6 transition-shadow hover:shadow-glow"
-    >
-      {/* animated moving gradient sheen on hover */}
-      <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent-cyan/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-
-      <motion.div
-        whileHover={{ rotate: 12, scale: 1.1 }}
-        transition={{ type: "spring", stiffness: 300 }}
-        className="relative mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent-cyan/20 to-accent-blue/20 text-accent-cyan"
-      >
-        <f.icon className="h-5 w-5" />
-      </motion.div>
-      <h3 className="relative text-base font-semibold text-slate-100">
-        {f.title}
-      </h3>
-      <p className="relative mt-2 text-sm leading-relaxed text-slate-500">
-        {f.desc}
-      </p>
-      <div className="relative mt-4 h-px w-0 bg-gradient-to-r from-accent-cyan to-accent-blue transition-all duration-500 group-hover:w-full" />
-    </motion.div>
-  );
-}
-
-function GithubIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.09 3.29 9.4 7.86 10.93.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.64 1.59.24 2.76.12 3.05.74.8 1.18 1.82 1.18 3.08 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
-    </svg>
-  );
-}
-
-function InstagramIcon(props) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      {...props}
-    >
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function TelegramIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <path d="M21.5 3.5 2.7 10.9c-1.1.44-1.1 1.06-.2 1.34l4.8 1.5 1.8 5.6c.22.6.38.84.78.84.33 0 .48-.15.68-.34l1.9-1.85 4 2.95c.73.4 1.26.2 1.44-.68l2.6-12.3c.27-1.1-.42-1.6-1-1.36Zm-11.6 9.5-1.1-3.6 8.6-5.4c.28-.17.53-.08.32.11l-7.8 8.9Z" />
-    </svg>
   );
 }

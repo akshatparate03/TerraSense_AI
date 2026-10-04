@@ -16,6 +16,20 @@ class PredictionRequest(BaseModel):
     trigger_hint: Optional[str] = Field(default="rain", description="'rain' | 'seismic' | 'other'")
     location_accuracy_km: Optional[float] = Field(default=1.0, ge=0, le=200)
 
+    # Optional site details. The Predict page's "I have these values" flow sends
+    # the ones the automatic data fetch could not retrieve (soil texture,
+    # nearby buildings, construction sites). All optional, so older callers
+    # keep working unchanged.
+    radius_km: Optional[float] = Field(default=None, ge=0.5, le=25)
+    soil_texture_class: Optional[str] = Field(default=None, description="'sandy' | 'silty' | 'clay-rich' | 'loam'")
+    sand_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    silt_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    clay_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    soil_ph: Optional[float] = Field(default=None, ge=0, le=14)
+    aspect_deg: Optional[float] = Field(default=None, ge=0, le=360)
+    building_count: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    construction_site_count: Optional[int] = Field(default=None, ge=0, le=100_000)
+
 
 class MonitoringSubscribeRequest(BaseModel):
     """Body for POST /api/monitoring/start (spec sections 37-39)."""

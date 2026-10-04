@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import alerts, analytics_api, global_scan, health, landslide_events, locations, models_api, monitoring, predictions
+from app.api import alerts, analytics_api, global_scan, health, landslide_events, locations, models_api, monitoring, predictions, recent_landslides
 from app.api.auth import router as auth_router
 from app.core.config import settings
 from app.core.database import SessionLocal, engine, get_db
@@ -55,6 +55,7 @@ app.include_router(alerts.router)
 app.include_router(monitoring.router)
 app.include_router(global_scan.router)
 app.include_router(landslide_events.router)
+app.include_router(recent_landslides.router)
 app.include_router(models_api.router)
 app.include_router(analytics_api.router)
 
@@ -258,7 +259,7 @@ async def ws_live_scan(websocket: WebSocket):
             await websocket.receive_text()  # any message triggers a scan
             db = SessionLocal()
             try:
-                locations = db_service.list_locations(db, active_only=True)
+                locations = db_service.list_locations(db, active_only=True, watchlist_only=True)
                 await websocket.send_json({"type": "scan_started", "total": len(locations)})
                 results = []
                 for loc in locations:
@@ -314,6 +315,12 @@ async def _ensure_schema_additions():
                 text(
                     "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
                     "user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE locations ADD COLUMN IF NOT EXISTS "
+                    "is_watchlist BOOLEAN NOT NULL DEFAULT FALSE"
                 )
             )
     except Exception as e:  # noqa: BLE001

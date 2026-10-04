@@ -28,10 +28,12 @@ ALERT_MESSAGES = {
 # ---------------------------------------------------------------------------
 # Locations
 # ---------------------------------------------------------------------------
-def list_locations(db: Session, active_only: bool = True) -> list[Location]:
+def list_locations(db: Session, active_only: bool = True, watchlist_only: bool = False) -> list[Location]:
     q = db.query(Location)
     if active_only:
         q = q.filter(Location.is_active.is_(True))
+    if watchlist_only:
+        q = q.filter(Location.is_watchlist.is_(True))
     return q.order_by(Location.name).all()
 
 
@@ -564,3 +566,43 @@ def analytics_alerts(db: Session) -> dict:
         "by_level": {level: count for level, count in rows},
         "by_status": {status: count for status, count in by_status},
     }
+
+
+
+def get_user_prediction_points(db: Session, user_id: int, limit: int = 300) -> list[dict]:
+    """Latest prediction per location for ONE user (every prediction the user
+    made from any page -- live map, manual entry -- is stored with user_id).
+    Used by the Dashboard 3D terrain so it only shows the user's own places.
+    Simulation-replay and scheduled-scan predictions have no user_id, so they
+    are naturally excluded."""
+    rows = (
+        db.query(Prediction)
+        .filter(
+            Prediction.user_id == user_id,
+            Prediction.prediction_source != "simulation",
+            Prediction.location_id.isnot(None),
+        )
+        .order_by(Prediction.timestamp.desc())
+        .limit(2000)
+        .all()
+    )
+    seen: set[int] = set()
+    points: list[dict] = []
+    for p in rows:
+        if p.location_id in seen or p.location is None:
+            continue
+        seen.add(p.location_id)
+        points.append(
+            {
+                "location_id": p.location_id,
+                "name": p.location.name,
+                "latitude": p.location.latitude,
+                "longitude": p.location.longitude,
+                "risk_level": p.risk_level,
+                "probability": p.risk_probability,
+                "predicted_at": p.timestamp.isoformat() if p.timestamp else None,
+            }
+        )
+        if len(points) >= limit:
+            break
+    return points

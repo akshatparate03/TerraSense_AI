@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
@@ -14,12 +14,10 @@ import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 import ResetPassword from "./pages/auth/ResetPassword.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
-import LiveGlobalScan from "./pages/LiveGlobalScan.jsx";
 import SimulationArchive from "./pages/SimulationArchive.jsx";
 import Predict from "./pages/Predict.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Historical from "./pages/Historical.jsx";
-import MLModel from "./pages/MLModel.jsx";
 import MapView from "./pages/MapView.jsx";
 import Alerts from "./pages/Alerts.jsx";
 import Locations from "./pages/Locations.jsx";
@@ -58,16 +56,17 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/monitoring" element={<LiveGlobalScan />} />
                   <Route path="/simulation-archive" element={<SimulationArchive />} />
                   <Route path="/predict" element={<Predict />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/historical" element={<Historical />} />
-                  <Route path="/model" element={<MLModel />} />
                   <Route path="/map" element={<MapView />} />
                   <Route path="/locations" element={<Locations />} />
                   <Route path="/alerts" element={<Alerts />} />
                   <Route path="/about" element={<About />} />
+                  {/* Removed pages (/monitoring -> now part of Home, /model -> deleted)
+                      and any unknown URL land on Home instead of a blank screen. */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

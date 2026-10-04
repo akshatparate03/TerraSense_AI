@@ -6,8 +6,7 @@ import {
   ErrorState,
 } from "../components/ui.jsx";
 import Seo from "../components/Seo.jsx";
-import { getDatasetAnalytics, getCorrelationMatrix } from "../services/api.js";
-import InteractiveCorrelationHeatmap from "../components/InteractiveCorrelationHeatmap.jsx";
+import { getDatasetAnalytics } from "../services/api.js";
 import { humanize } from "../utils/format.js";
 import {
   BarChart,
@@ -38,16 +37,12 @@ const MONTH_NAMES = [
 
 export default function Analytics() {
   const [data, setData] = useState(null);
-  const [correlation, setCorrelation] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     getDatasetAnalytics()
       .then(setData)
       .catch((e) => setError(e.message));
-    getCorrelationMatrix()
-      .then(setCorrelation)
-      .catch(() => {});
   }, []);
 
   if (error) return <ErrorState message={error} />;
@@ -66,7 +61,7 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      <Seo description="TerraSense AI data science analytics dashboard — descriptive statistics, seasonal trends, and correlations from the real NASA Global Landslide Catalog." />
+      <Seo description="TerraSense AI data science analytics dashboard — descriptive statistics and seasonal trends from the real NASA Global Landslide Catalog." />
       <div>
         <h1 className="text-xl font-bold text-slate-50">Analytics</h1>
         <p className="text-sm text-slate-500">
@@ -192,18 +187,6 @@ export default function Analytics() {
           </ResponsiveContainer>
         </Card>
       </div>
-
-      <Card>
-        <SectionTitle
-          title="Feature Correlation Heatmap"
-          subtitle="Training feature set — hover any cell"
-        />
-        {correlation ? (
-          <InteractiveCorrelationHeatmap data={correlation} />
-        ) : (
-          <LoadingSkeleton className="h-64" />
-        )}
-      </Card>
     </div>
   );
 }

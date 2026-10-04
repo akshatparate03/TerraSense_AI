@@ -59,6 +59,11 @@ class Location(Base):
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     elevation: Mapped[float | None] = mapped_column(Float)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # True only for the curated public Live Risk Scan watchlist (seeded by
+    # scripts/seed_database.py). Locations created as a side-effect of a user's
+    # own prediction are NOT watchlist locations, so they never show up on the
+    # public Home page scan.
+    is_watchlist: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

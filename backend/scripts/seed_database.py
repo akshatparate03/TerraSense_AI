@@ -69,9 +69,12 @@ def seed_locations(db) -> dict[str, int]:
     for loc in CURATED_LOCATIONS:
         existing = db.query(Location).filter(Location.name == loc["name"]).first()
         if existing:
+            if not existing.is_watchlist:
+                existing.is_watchlist = True
+                db.commit()
             name_to_id[loc["name"]] = existing.id
             continue
-        row = Location(**loc)
+        row = Location(**loc, is_watchlist=True)
         db.add(row)
         db.commit()
         db.refresh(row)
@@ -165,13 +168,21 @@ def seed_model_runs(db) -> int:
 
 
 def main():
+    # --skip-events: skips importing the ~11k historical events into the
+    # `landslide_events` table. The website's Historical Events / Analytics
+    # pages read the CSV catalog directly, so this table is optional -- and
+    # importing it row-by-row into a remote database (Neon) takes a long time.
+    skip_events = "--skip-events" in sys.argv
     db = SessionLocal()
     try:
         print("Seeding locations...")
         seed_locations(db)
-        print("Importing historical landslide events...")
-        n = seed_landslide_events(db)
-        print(f"  {n} new events imported")
+        if skip_events:
+            print("Skipping historical landslide event import (--skip-events)")
+        else:
+            print("Importing historical landslide events...")
+            n = seed_landslide_events(db)
+            print(f"  {n} new events imported")
         print("Registering model runs...")
         m = seed_model_runs(db)
         print(f"  {m} new model runs registered")

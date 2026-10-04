@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/scan", tags=["global-scan"])
 async def scan_watchlist(db: Session = Depends(get_db)):
     """The real, named locations a scan checks -- for the frontend to show
     'checking N real regions worldwide' rather than a vague claim."""
-    locations = db_service.list_locations(db, active_only=True)
+    locations = db_service.list_locations(db, active_only=True, watchlist_only=True)
     return {
         "total": len(locations),
         "locations": [
@@ -41,7 +41,7 @@ async def latest_scan_results(db: Session = Depends(get_db)):
     """Most recent real prediction per watchlist location, without
     triggering a new scan -- lets the frontend show last-known results
     immediately on page load."""
-    locations = db_service.list_locations(db, active_only=True)
+    locations = db_service.list_locations(db, active_only=True, watchlist_only=True)
     results = []
     for loc in locations:
         pred = db_service.get_latest_prediction_for_location(db, loc.id)

@@ -8,5 +8,9 @@ frontend/.env
 frontend/GUIDE.md
 frontend/RUNGUIDE.md
 frontend/CHANGES.md
+frontend/DEPLOY.md
 backend/data/app.db
 .DS_Store
+backend/data/cache/
+.venv/
+backend/.venv/

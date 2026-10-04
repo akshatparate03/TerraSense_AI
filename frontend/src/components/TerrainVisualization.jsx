@@ -5,6 +5,31 @@ import * as THREE from "three";
 import { Maximize2, Minimize2, MousePointerClick } from "lucide-react";
 
 const RISK_COLOR = { LOW: "#34d399", MEDIUM: "#f59e0b", HIGH: "#f43f5e" };
+const TERRAIN_TILT = -Math.PI / 2.4;
+
+// Procedural conceptual terrain (layered sine noise) - NOT real elevation data.
+function terrainHeight(x, y) {
+  return (
+    Math.sin(x * 0.35) * 1.6 +
+    Math.cos(y * 0.3) * 1.6 +
+    Math.sin((x + y) * 0.18) * 2.2 +
+    Math.cos(x * 0.6 - y * 0.4) * 0.8
+  );
+}
+
+// Terrain-plane coordinates (x, y) -> world position of the surface point,
+// using the same rotation the terrain mesh gets, so markers sit exactly on it.
+function surfaceToWorld(x, y, lift = 0.35) {
+  const h = terrainHeight(x, y) + lift;
+  const c = Math.cos(TERRAIN_TILT);
+  const s = Math.sin(TERRAIN_TILT);
+  return [x, y * c - h * s, y * s + h * c];
+}
+
+// Equirectangular projection of lat/lon onto the terrain plane (40 x 40).
+function latLonToTerrain(lat, lon) {
+  return [(lon / 180) * 17, (lat / 90) * 17];
+}
 
 function Terrain() {
   const geometry = useMemo(() => {
@@ -13,15 +38,7 @@ function Terrain() {
     const geo = new THREE.PlaneGeometry(size, size, segments, segments);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      // Procedural conceptual terrain (layered sine noise) - NOT real elevation data.
-      const h =
-        Math.sin(x * 0.35) * 1.6 +
-        Math.cos(y * 0.3) * 1.6 +
-        Math.sin((x + y) * 0.18) * 2.2 +
-        Math.cos(x * 0.6 - y * 0.4) * 0.8;
-      pos.setZ(i, h);
+      pos.setZ(i, terrainHeight(pos.getX(i), pos.getY(i)));
     }
     geo.computeVertexNormals();
     return geo;
@@ -30,7 +47,7 @@ function Terrain() {
   return (
     <mesh
       geometry={geometry}
-      rotation={[-Math.PI / 2.4, 0, 0]}
+      rotation={[TERRAIN_TILT, 0, 0]}
       receiveShadow
       castShadow
     >
@@ -71,8 +88,54 @@ function RiskHotspot({ position, level, name, showLabel }) {
   );
 }
 
+// Many data points (hundreds) drawn with ONE instanced mesh so the page stays
+// smooth. Each instance gets its own colour and a gentle pulse.
+function PointCloud({ placed }) {
+  const meshRef = useRef();
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const color = new THREE.Color();
+    placed.forEach((p, i) => {
+      color.set(RISK_COLOR[p.level] || RISK_COLOR.LOW);
+      mesh.setColorAt(i, color);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [placed]);
+
+  useFrame(({ clock }) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const t = clock.getElapsedTime();
+    placed.forEach((p, i) => {
+      const s = 1 + Math.sin(t * 2.2 + i * 0.7) * 0.2;
+      dummy.position.set(p.world[0], p.world[1], p.world[2]);
+      dummy.scale.set(s, s, s);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  if (!placed.length) return null;
+  return (
+    <instancedMesh
+      key={placed.length}
+      ref={meshRef}
+      args={[null, null, placed.length]}
+      frustumCulled={false}
+    >
+      <sphereGeometry args={[0.24, 12, 12]} />
+      <meshStandardMaterial emissive="#ffffff" emissiveIntensity={0.35} />
+    </instancedMesh>
+  );
+}
+
 // 12 conceptual hotspots (mixed risk levels) across the terrain, each labeled
-// with a real landslide-prone location name for context.
+// with a real landslide-prone location name for context. Still used by the
+// About page, which shows a purely illustrative terrain.
 export const DEFAULT_HOTSPOTS = [
   { position: [-6, 3, 4], level: "HIGH", name: "Shimla, India" },
   { position: [3, 2.5, -5], level: "MEDIUM", name: "Darjeeling, India" },
@@ -88,22 +151,40 @@ export const DEFAULT_HOTSPOTS = [
   { position: [1, 2.9, -9], level: "MEDIUM", name: "Wayanad, India" },
 ];
 
-function Scene({ hotspots, showLabels, controlsActive }) {
+function Scene({ hotspots, placed, labelled, showLabels, controlsActive }) {
   return (
     <>
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 15, 8]} intensity={1.1} castShadow />
       <fog attach="fog" args={["#0a0e14", 15, 45]} />
       <Terrain />
-      {hotspots.map((h, i) => (
-        <RiskHotspot
-          key={i}
-          position={h.position}
-          level={h.level}
-          name={h.name}
-          showLabel={showLabels}
-        />
-      ))}
+
+      {placed ? (
+        <>
+          <PointCloud placed={placed} />
+          {showLabels &&
+            labelled.map((p) => (
+              <group key={p.key} position={p.world}>
+                <Html distanceFactor={14} position={[0, 0.55, 0]} center occlude>
+                  <div className="pointer-events-none whitespace-nowrap rounded-md border border-white/10 bg-base-950/80 px-2 py-0.5 text-[10px] font-medium text-slate-200 backdrop-blur">
+                    {p.name}
+                  </div>
+                </Html>
+              </group>
+            ))}
+        </>
+      ) : (
+        hotspots.map((h, i) => (
+          <RiskHotspot
+            key={i}
+            position={h.position}
+            level={h.level}
+            name={h.name}
+            showLabel={showLabels}
+          />
+        ))
+      )}
+
       <OrbitControls
         enabled={controlsActive}
         enablePan={false}
@@ -117,7 +198,41 @@ function Scene({ hotspots, showLabels, controlsActive }) {
   );
 }
 
+function Legend() {
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-3 rounded-lg border border-base-600 bg-base-900/80 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur">
+      {[
+        ["#34d399", "Low"],
+        ["#f59e0b", "Medium"],
+        ["#f43f5e", "High"],
+      ].map(([c, label]) => (
+        <span key={label} className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: c }}
+          />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Props:
+ *  - points:  [{ latitude, longitude, level: "LOW"|"MEDIUM"|"HIGH", name }]
+ *             Real data mode -- each point is placed on the terrain by its
+ *             lat/lon (world map projected onto the terrain). When this prop is
+ *             given (even as an empty array) the illustrative hotspots are NOT
+ *             shown.
+ *  - emptyMessage: text shown over the terrain when `points` is empty.
+ *  - labelLimit: how many points (highest first) get a name label.
+ *  - hotspots: legacy illustrative hotspots (About page only).
+ */
 export default function TerrainVisualization({
+  points,
+  emptyMessage = "No data points to show yet.",
+  labelLimit = 12,
   hotspots = DEFAULT_HOTSPOTS,
   height = 360,
   className = "",
@@ -133,6 +248,31 @@ export default function TerrainVisualization({
   // mid-gesture, and deactivating right then would abort the drag and
   // immediately show the "click to interact" hint again.
   const [controlsActive, setControlsActive] = useState(false);
+
+  const dataMode = Array.isArray(points);
+
+  const placed = useMemo(() => {
+    if (!dataMode) return null;
+    return points
+      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+      .map((p, i) => {
+        const [x, y] = latLonToTerrain(p.latitude, p.longitude);
+        return {
+          key: p.id ?? p.location_id ?? i,
+          name: p.name,
+          level: p.level || p.risk_level || "LOW",
+          world: surfaceToWorld(x, y),
+        };
+      });
+  }, [points, dataMode]);
+
+  const labelled = useMemo(() => {
+    if (!placed) return [];
+    const rank = { HIGH: 2, MEDIUM: 1, LOW: 0 };
+    return [...placed]
+      .sort((a, b) => rank[b.level] - rank[a.level])
+      .slice(0, labelLimit);
+  }, [placed, labelLimit]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -161,6 +301,8 @@ export default function TerrainVisualization({
       await document.exitFullscreen?.();
     }
   };
+
+  const isEmpty = dataMode && placed.length === 0;
 
   return (
     <div
@@ -193,12 +335,24 @@ export default function TerrainVisualization({
       >
         <Scene
           hotspots={hotspots}
+          placed={placed}
+          labelled={labelled}
           showLabels={showLabels}
           controlsActive={controlsActive}
         />
       </Canvas>
 
-      {!controlsActive && (
+      {dataMode && <Legend />}
+
+      {isEmpty && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6">
+          <p className="max-w-sm rounded-xl border border-base-600 bg-base-900/85 px-4 py-3 text-center text-xs text-slate-300 backdrop-blur">
+            {emptyMessage}
+          </p>
+        </div>
+      )}
+
+      {!controlsActive && !isEmpty && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-base-950/20">
           <div className="flex items-center gap-2 rounded-full border border-base-600 bg-base-900/80 px-4 py-2 text-xs font-medium text-slate-300 backdrop-blur">
             <MousePointerClick className="h-3.5 w-3.5" /> Click to interact

@@ -9,7 +9,12 @@ import {
 } from "../components/ui.jsx";
 import Seo from "../components/Seo.jsx";
 import MapPicker from "../components/MapPicker.jsx";
-import { postPredict, postPredictLocation } from "../services/api.js";
+import MissingDataDialog from "../components/MissingDataDialog.jsx";
+import {
+  postPredict,
+  postPredictLocation,
+  getLocationFeatures,
+} from "../services/api.js";
 
 const RADIUS_OPTIONS = [1, 3, 5, 10, 25];
 
@@ -24,6 +29,51 @@ const MANUAL_FIELDS = [
   { key: "longitude", label: "Longitude", min: -180, max: 180, step: 0.01, default: 77.4 },
 ];
 
+// Site details the automatic data fetch sometimes cannot retrieve. Optional in
+// plain manual mode; REQUIRED when the user arrives from the "I have these
+// values" dialog for the ones that were flagged.
+const SOIL_TEXTURES = [
+  { value: "sandy", label: "Sandy" },
+  { value: "silty", label: "Silty" },
+  { value: "clay-rich", label: "Clay-rich" },
+  { value: "loam", label: "Loam" },
+];
+
+const SITE_FIELD_LABELS = {
+  soil_texture_class: "Soil texture",
+  building_count: "Nearby buildings",
+  construction_site_count: "Construction sites",
+};
+
+const FETCHED_OK = new Set(["LIVE", "CACHED", "DEMO"]);
+
+// Which of soil texture / nearby buildings / construction sites could NOT be
+// fetched for this location (ESTIMATED or UNAVAILABLE counts as not fetched).
+function findMissingSiteData(geo) {
+  const st = geo?.data_status || {};
+  const soil = geo?.soil || {};
+  const cons = geo?.construction || {};
+  const missing = [];
+  if (!FETCHED_OK.has(st.soil) || !soil.soil_texture_class) {
+    missing.push({ key: "soil_texture_class", label: "Soil texture" });
+  }
+  if (!FETCHED_OK.has(st.construction) || cons.building_count == null) {
+    missing.push({ key: "building_count", label: "Nearby buildings" });
+  }
+  if (
+    !FETCHED_OK.has(st.construction) ||
+    cons.active_construction_site_count == null
+  ) {
+    missing.push({ key: "construction_site_count", label: "Construction sites" });
+  }
+  return missing;
+}
+
+const roundTo = (v, d = 2) =>
+  v === null || v === undefined || Number.isNaN(Number(v))
+    ? ""
+    : String(Math.round(Number(v) * 10 ** d) / 10 ** d);
+
 function formatFeature(key) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -32,7 +82,7 @@ function DataStatusPill({ status }) {
   const color =
     status === "LIVE"
       ? "emerald"
-      : status === "CACHED"
+      : status === "CACHED" || status === "USER"
       ? "cyan"
       : status === "DEMO" || status === "ESTIMATED"
       ? "amber"
@@ -98,6 +148,25 @@ function ResultPanel({ result, error, loading, placeholderText }) {
             </Card>
           )}
 
+          {result.supplied_site_inputs && (
+            <Card>
+              <SectionTitle
+                title="Your Supplied Site Values"
+                subtitle="Entered by you — not fetched automatically"
+              />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {Object.entries(result.supplied_site_inputs).map(([k, v]) => (
+                  <EnvCard
+                    key={k}
+                    label={SITE_FIELD_LABELS[k] || formatFeature(k)}
+                    value={String(v)}
+                    status="USER"
+                  />
+                ))}
+              </div>
+            </Card>
+          )}
+
           <Card>
             <SectionTitle title="Risk Drivers" subtitle="From the trained model's feature importances" />
             <div className="space-y-3">
@@ -150,11 +219,10 @@ export default function Predict() {
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState(null);
 
-  const analyzeLocation = async () => {
-    if (selected.lat == null || selected.lon == null) {
-      setLocError("Select a location on the map or use your current location first.");
-      return;
-    }
+  const [dialog, setDialog] = useState({ open: false, missing: [], geo: null });
+
+  // Step 2 (also used directly when nothing is missing): run the real prediction.
+  const runLocationPrediction = async () => {
     setLocLoading(true);
     setLocError(null);
     try {
@@ -171,13 +239,51 @@ export default function Predict() {
     }
   };
 
+  // Step 1: look at what could be fetched. If soil texture / buildings /
+  // construction sites are missing, ask the user BEFORE showing any result.
+  const analyzeLocation = async () => {
+    if (selected.lat == null || selected.lon == null) {
+      setLocError("Select a location on the map or use your current location first.");
+      return;
+    }
+    setLocLoading(true);
+    setLocError(null);
+    let geo = null;
+    try {
+      geo = await getLocationFeatures(selected.lat, selected.lon, radiusKm);
+    } catch {
+      geo = null; // preview failed -> let the prediction call report any real error
+    }
+    const missing = geo ? findMissingSiteData(geo) : [];
+    if (missing.length === 0) {
+      await runLocationPrediction();
+      return;
+    }
+    setLocLoading(false);
+    setDialog({ open: true, missing, geo });
+  };
+
+  const closeDialog = () => setDialog({ open: false, missing: [], geo: null });
+
+  const useEstimatedValues = () => {
+    closeDialog();
+    runLocationPrediction();
+  };
+
   // --- Manual (legacy) mode state ---
   // Fields start EMPTY (not pre-filled with the default) so the input can
   // actually be cleared/edited normally -- the `default` is only shown as
   // a placeholder and used as the fallback value at submit time.
-  const [form, setForm] = useState(
-    Object.fromEntries(MANUAL_FIELDS.map((f) => [f.key, ""])),
-  );
+  const [form, setForm] = useState({
+    ...Object.fromEntries(MANUAL_FIELDS.map((f) => [f.key, ""])),
+    soil_texture_class: "",
+    building_count: "",
+    construction_site_count: "",
+  });
+  // Site fields flagged as "couldn't be fetched" (must be filled before predicting)
+  const [manualMissing, setManualMissing] = useState([]);
+  // Values that came with the fetch but have no input box (soil pH, sand/silt/clay, aspect, radius)
+  const [manualExtras, setManualExtras] = useState({});
   const [triggerHint, setTriggerHint] = useState("rain");
   const [manualResult, setManualResult] = useState(null);
   const [manualLoading, setManualLoading] = useState(false);
@@ -188,7 +294,57 @@ export default function Predict() {
   // is what caused the "stuck 0" bug.
   const updateManual = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
+  // "I have these values": jump to the manual tab. Everything that WAS fetched
+  // is pre-filled; only the fields that could not be fetched stay empty.
+  const provideValues = () => {
+    const { geo, missing } = dialog;
+    const missingKeys = missing.map((m) => m.key);
+    const w = geo.weather || {};
+    const t = geo.elevation_slope || {};
+    const soil = geo.soil || {};
+    const cons = geo.construction || {};
+    const soilKnown = !missingKeys.includes("soil_texture_class");
+
+    setForm({
+      rainfall_mm: roundTo(w.rainfall_24h),
+      soil_moisture_pct: roundTo(w.soil_moisture_pct),
+      temperature_c: roundTo(w.temperature_c),
+      humidity_pct: roundTo(w.humidity_pct),
+      slope_deg: roundTo(t.slope_deg),
+      elevation_m: roundTo(t.elevation_m),
+      latitude: roundTo(selected.lat, 4),
+      longitude: roundTo(selected.lon, 4),
+      soil_texture_class: soilKnown ? soil.soil_texture_class || "" : "",
+      building_count: missingKeys.includes("building_count") ? "" : roundTo(cons.building_count, 0),
+      construction_site_count: missingKeys.includes("construction_site_count")
+        ? ""
+        : roundTo(cons.active_construction_site_count, 0),
+    });
+    setManualExtras({
+      radius_km: geo.radius_km ?? radiusKm,
+      aspect_deg: t.aspect_deg ?? null,
+      soil_ph: soilKnown ? soil.soil_ph ?? null : null,
+      sand_pct: soilKnown ? soil.sand_pct ?? null : null,
+      silt_pct: soilKnown ? soil.silt_pct ?? null : null,
+      clay_pct: soilKnown ? soil.clay_pct ?? null : null,
+      fetchedTexture: soilKnown ? soil.soil_texture_class || null : null,
+    });
+    setManualMissing(missingKeys);
+    setTriggerHint("rain");
+    setManualResult(null);
+    setManualError(null);
+    closeDialog();
+    setMode("manual");
+  };
+
   const submitManual = async () => {
+    const stillEmpty = manualMissing.filter((k) => form[k] === "" || form[k] == null);
+    if (stillEmpty.length > 0) {
+      setManualError(
+        `Please enter: ${stillEmpty.map((k) => SITE_FIELD_LABELS[k]).join(", ")}.`,
+      );
+      return;
+    }
     setManualLoading(true);
     setManualError(null);
     try {
@@ -200,10 +356,32 @@ export default function Predict() {
             : Number(form[f.key]),
         ]),
       );
-      const res = await postPredict({ ...payload, trigger_hint: triggerHint });
+
+      const site = { radius_km: manualExtras.radius_km ?? radiusKm };
+      if (form.soil_texture_class) site.soil_texture_class = form.soil_texture_class;
+      if (form.building_count !== "") site.building_count = Math.max(0, Math.round(Number(form.building_count)));
+      if (form.construction_site_count !== "") {
+        site.construction_site_count = Math.max(0, Math.round(Number(form.construction_site_count)));
+      }
+      if (manualExtras.aspect_deg != null) site.aspect_deg = manualExtras.aspect_deg;
+      if (manualExtras.soil_ph != null) site.soil_ph = manualExtras.soil_ph;
+      // Keep the fetched sand/silt/clay only while the texture is the fetched one;
+      // if the user picked a different texture the server derives them from it.
+      if (
+        form.soil_texture_class &&
+        form.soil_texture_class === manualExtras.fetchedTexture &&
+        manualExtras.sand_pct != null
+      ) {
+        site.sand_pct = manualExtras.sand_pct;
+        site.silt_pct = manualExtras.silt_pct;
+        site.clay_pct = manualExtras.clay_pct;
+      }
+
+      const res = await postPredict({ ...payload, ...site, trigger_hint: triggerHint });
       setManualResult(res);
     } catch (e) {
-      setManualError(e.response?.data?.detail || e.message);
+      const detail = e.response?.data?.detail;
+      setManualError(typeof detail === "string" ? detail : detail?.message || e.message);
     } finally {
       setManualLoading(false);
     }
@@ -221,7 +399,10 @@ export default function Predict() {
         </div>
         <div className="flex rounded-xl border border-base-600 bg-base-800/40 p-1 text-xs font-medium">
           <button
-            onClick={() => setMode("location")}
+            onClick={() => {
+              setMode("location");
+              setManualMissing([]);
+            }}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors ${
               mode === "location" ? "bg-accent-cyan/15 text-accent-cyan" : "text-slate-400 hover:text-slate-200"
             }`}
@@ -234,7 +415,7 @@ export default function Predict() {
               mode === "manual" ? "bg-accent-cyan/15 text-accent-cyan" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            <Sliders className="h-3.5 w-3.5" /> Manual (Legacy)
+            <Sliders className="h-3.5 w-3.5" /> Manual Entry
           </button>
         </div>
       </div>
@@ -291,7 +472,7 @@ export default function Predict() {
           <Card>
             <SectionTitle
               title="Environmental Conditions"
-              subtitle="Legacy manual entry — kept for testing/demo only. Prefer Live Location above."
+              subtitle="Enter the values yourself. Anything fetched automatically is pre-filled."
             />
             <div className="grid grid-cols-2 gap-4">
               {MANUAL_FIELDS.map((f) => (
@@ -306,6 +487,61 @@ export default function Predict() {
                     placeholder={String(f.default)}
                     onChange={(e) => updateManual(f.key, e.target.value)}
                     className="w-full rounded-lg border border-base-600 bg-base-800/60 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-accent-cyan/50"
+                  />
+                </div>
+              ))}
+              <div className="col-span-2 mt-1 border-t border-base-700/60 pt-3">
+                <p className="text-xs font-semibold text-slate-300">Site details</p>
+                <p className="text-[11px] text-slate-500">
+                  Optional. Buildings and construction sites are counted within a{" "}
+                  {manualExtras.radius_km ?? radiusKm} km radius.
+                </p>
+              </div>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Soil Texture
+                  {manualMissing.includes("soil_texture_class") && (
+                    <span className="ml-2 text-amber-400">· couldn't be fetched — please enter</span>
+                  )}
+                </label>
+                <select
+                  value={form.soil_texture_class}
+                  onChange={(e) => updateManual("soil_texture_class", e.target.value)}
+                  className={`w-full rounded-lg border bg-base-800/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-accent-cyan/50 ${
+                    manualMissing.includes("soil_texture_class") && !form.soil_texture_class
+                      ? "border-amber-500/60"
+                      : "border-base-600"
+                  }`}
+                >
+                  <option value="">Not specified</option>
+                  {SOIL_TEXTURES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              {[
+                ["building_count", "Nearby Buildings (count)"],
+                ["construction_site_count", "Construction Sites (count)"],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label className="mb-1 block text-xs font-medium text-slate-400">
+                    {label}
+                    {manualMissing.includes(key) && (
+                      <span className="ml-1 text-amber-400">· please enter</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form[key]}
+                    placeholder="e.g. 0"
+                    onChange={(e) => updateManual(key, e.target.value)}
+                    className={`w-full rounded-lg border bg-base-800/60 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-accent-cyan/50 ${
+                      manualMissing.includes(key) && form[key] === ""
+                        ? "border-amber-500/60"
+                        : "border-base-600"
+                    }`}
                   />
                 </div>
               ))}
@@ -340,6 +576,14 @@ export default function Predict() {
           />
         </div>
       )}
+
+      <MissingDataDialog
+        open={dialog.open}
+        missing={dialog.missing}
+        onUseEstimated={useEstimatedValues}
+        onProvide={provideValues}
+        onClose={closeDialog}
+      />
     </div>
   );
 }

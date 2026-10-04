@@ -272,10 +272,10 @@ export default function About() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
-                to="/model"
+                to={user ? "/analytics" : "/login"}
                 className="rounded-full border border-base-600 px-6 py-3 text-sm font-medium text-slate-300 backdrop-blur transition-colors hover:bg-base-800"
               >
-                See the ML Engine
+                Explore Analytics
               </Link>
             </motion.div>
 

@@ -1,16 +1,28 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user_optional
+from app.core.config import settings
+from app.core.deps import get_current_user, get_current_user_optional
 from app.ml.inference import ModelNotLoadedError, inference_service
 from app.schemas.schemas import LocationPredictionRequest, PredictionRequest
 from app.services import db_service
 from app.services.geo_data_service import geo_data_engine
+
+# Representative sand/silt/clay % for the 4 texture buckets the geo engine itself
+# uses (see GeoDataEngine._classify_texture) -- applied only when a user picks a
+# texture class manually instead of supplying exact percentages.
+TEXTURE_PROFILES = {
+    "sandy": (80.0, 12.0, 8.0),
+    "silty": (15.0, 70.0, 15.0),
+    "clay-rich": (20.0, 25.0, 55.0),
+    "loam": (40.0, 40.0, 20.0),
+}
 
 router = APIRouter(prefix="/api/predictions", tags=["predictions"])
 location_router = APIRouter(prefix="/api/location", tags=["location"])
@@ -37,12 +49,34 @@ async def create_prediction(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user_optional),
 ):
+    model_payload = payload.model_dump()
+    supplied: dict = {}
+
+    texture = (payload.soil_texture_class or "").strip().lower()
+    if texture:
+        if texture not in TEXTURE_PROFILES:
+            raise HTTPException(status_code=422, detail=f"soil_texture_class must be one of {sorted(TEXTURE_PROFILES)}")
+        supplied["soil_texture_class"] = texture
+        # Only fill percentages the user did not give explicitly.
+        sand, silt, clay = TEXTURE_PROFILES[texture]
+        if model_payload.get("sand_pct") is None:
+            model_payload["sand_pct"], model_payload["silt_pct"], model_payload["clay_pct"] = sand, silt, clay
+    if payload.building_count is not None:
+        supplied["building_count"] = payload.building_count
+        area_km2 = math.pi * (payload.radius_km or settings.DEFAULT_ANALYSIS_RADIUS_KM) ** 2
+        model_payload["building_density_per_km2"] = round(payload.building_count / area_km2, 2)
+    if payload.construction_site_count is not None:
+        supplied["construction_site_count"] = payload.construction_site_count
+        model_payload["construction_site_count"] = payload.construction_site_count
+
     try:
-        result = inference_service.predict(payload.model_dump())
+        result = inference_service.predict(model_payload)
     except ModelNotLoadedError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Prediction failed: {e}")
+    if supplied:
+        result["supplied_site_inputs"] = supplied
 
     location = db_service.get_or_create_location_by_coords(
         db, f"Manual prediction ({payload.latitude:.2f}, {payload.longitude:.2f})", payload.latitude, payload.longitude
@@ -166,6 +200,21 @@ async def list_predictions(
         db, limit, offset, location_id, risk_level, model_version, date_from, date_to
     )
     return {"total": total, "limit": limit, "offset": offset, "items": [_serialize(p) for p in items]}
+
+
+@router.get("/mine/points")
+async def my_prediction_points(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    limit: int = Query(300, le=1000),
+):
+    """The logged-in user's OWN predicted locations (latest result per place),
+    from any page. Powers the Dashboard 3D terrain."""
+    points = db_service.get_user_prediction_points(db, current_user.id, limit)
+    counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    for p in points:
+        counts[p["risk_level"]] = counts.get(p["risk_level"], 0) + 1
+    return {"points": points, "total": len(points), "counts": counts}
 
 
 @router.get("/latest")

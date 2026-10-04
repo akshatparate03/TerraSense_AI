@@ -22,6 +22,7 @@ import {
   getDashboardSummary,
   getDatasetAnalytics,
   getActiveAlerts,
+  getMyPredictionPoints,
 } from "../services/api.js";
 import { titleCase, humanize } from "../utils/format.js";
 import {
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [myPoints, setMyPoints] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -67,6 +69,11 @@ export default function Dashboard() {
         setAlerts(al.items.slice(0, 5));
       })
       .catch((e) => setError(e.message));
+    // The user's own predicted locations for the 3D terrain. Loaded
+    // separately so a failure here never blocks the rest of the dashboard.
+    getMyPredictionPoints()
+      .then((d) => mounted && setMyPoints(d))
+      .catch(() => mounted && setMyPoints({ points: [], counts: {}, total: 0 }));
     return () => {
       mounted = false;
     };
@@ -232,8 +239,36 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <SectionTitle title="3D Terrain Risk Visualization" />
-        <TerrainVisualization />
+        <SectionTitle
+          title="Your Predicted Locations — 3D Terrain"
+          subtitle="Only the places you have run a prediction for (from any page). Green = low, yellow = medium, red = high risk."
+        />
+        <TerrainVisualization
+          points={(myPoints?.points || []).map((p) => ({
+            id: p.location_id,
+            name: `${p.name} · ${(p.probability * 100).toFixed(0)}%`,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            level: p.risk_level,
+          }))}
+          emptyMessage={
+            myPoints
+              ? "No predictions yet. Run a prediction on the Risk Prediction page and your locations will appear here."
+              : "Loading your locations..."
+          }
+          labelLimit={20}
+        />
+        {myPoints?.total > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            {myPoints.total} location{myPoints.total === 1 ? "" : "s"} ·{" "}
+            <span className="text-rose-400">{myPoints.counts.HIGH || 0} high</span>
+            {" · "}
+            <span className="text-amber-400">{myPoints.counts.MEDIUM || 0} medium</span>
+            {" · "}
+            <span className="text-emerald-400">{myPoints.counts.LOW || 0} low</span>
+            {" — latest result per location"}
+          </p>
+        )}
       </Card>
 
       <Card>

@@ -37,9 +37,11 @@ class Settings:
     # ------------------------------------------------------------------
     # Database (PostgreSQL - required)
     # ------------------------------------------------------------------
+    # Some hosts hand out "postgres://..." URLs; SQLAlchemy 2.x only accepts
+    # "postgresql://...", so normalise it here.
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/terrasense"
-    )
+    ).replace("postgres://", "postgresql://", 1)
 
     # ------------------------------------------------------------------
     # ML artifacts
@@ -101,6 +103,15 @@ class Settings:
     OVERPASS_API_URL: str = os.getenv(
         "OVERPASS_API_URL", "https://overpass-api.de/api/interpreter"
     )
+
+    # Home-page "last 12 months of landslides" 3D terrain. Tries NASA's public
+    # COOLR ArcGIS layer first and falls back to the bundled NASA catalog CSV.
+    RECENT_LANDSLIDES_LIVE: bool = os.getenv("RECENT_LANDSLIDES_LIVE", "true").lower() == "true"
+    NASA_LANDSLIDE_QUERY_URL: str = os.getenv(
+        "NASA_LANDSLIDE_QUERY_URL",
+        "https://maps.nccs.nasa.gov/mapping/rest/services/landslide_viewer/Landslide_Points/FeatureServer/0/query",
+    )
+    RECENT_LANDSLIDES_CACHE_HOURS: int = int(os.getenv("RECENT_LANDSLIDES_CACHE_HOURS", "6"))
 
     GEO_HTTP_TIMEOUT_SECONDS: float = float(os.getenv("GEO_HTTP_TIMEOUT_SECONDS", "12"))
     GEO_CACHE_TTL_MINUTES: int = int(os.getenv("GEO_CACHE_TTL_MINUTES", "30"))

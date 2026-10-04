@@ -131,6 +131,9 @@ export const getLatestPredictions = (limit = 10) =>
   api.get("/predictions/latest", { params: { limit } }).then((r) => r.data);
 export const getHighRiskPredictions = () =>
   api.get("/predictions/high-risk").then((r) => r.data);
+// The logged-in user's own predicted locations (Dashboard 3D terrain).
+export const getMyPredictionPoints = () =>
+  api.get("/predictions/mine/points").then((r) => r.data);
 
 // ---------------------------------------------------------------------------
 // Alerts
@@ -163,26 +166,9 @@ export const getEmailAlertHistory = () =>
 // ---------------------------------------------------------------------------
 export const getLandslideEvents = (params = {}) =>
   api.get("/landslide-events", { params }).then((r) => r.data);
-
-// ---------------------------------------------------------------------------
-// Model
-// ---------------------------------------------------------------------------
-export const getModelInfo = () => api.get("/model/info").then((r) => r.data);
-export const getModelMetrics = () =>
-  api.get("/model/metrics").then((r) => r.data);
-export const getModelFeatures = () =>
-  api.get("/model/features").then((r) => r.data);
-export const getConfusionMatrix = () =>
-  api.get("/model/confusion-matrix").then((r) => r.data);
-export const getRocCurve = () =>
-  api.get("/model/roc-curve").then((r) => r.data);
-export const getPrecisionRecallCurve = () =>
-  api.get("/model/precision-recall-curve").then((r) => r.data);
-export const getCorrelationMatrix = () =>
-  api.get("/dataset/correlation-matrix").then((r) => r.data);
-export const getModels = () => api.get("/models").then((r) => r.data);
-export const getLatestModel = () =>
-  api.get("/models/latest").then((r) => r.data);
+// Worldwide landslides for the last 12 months (Home 3D terrain), public.
+export const getRecentLandslides = (limit = 600) =>
+  api.get("/recent-landslides", { params: { limit } }).then((r) => r.data);
 
 // ---------------------------------------------------------------------------
 // Simulation

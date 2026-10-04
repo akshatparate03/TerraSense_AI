@@ -2,14 +2,9 @@ import React, { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
-  Radio,
   Target,
-  BarChart3,
   History,
   Archive,
-  BrainCircuit,
-  Map as MapIcon,
-  Info,
   Bell,
   MapPin,
   LogOut,
@@ -19,20 +14,19 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import AnimatedBackground from "./AnimatedBackground.jsx";
+import Footer from "./Footer.jsx";
 
+// Sidebar shows only these pages. Analytics, Locations / Map and About System
+// are reachable from the footer (see components/Footer.jsx). Live Risk Scan now
+// lives on the Home page, and the ML Model page was removed.
 const NAV = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/monitoring", label: "Live Risk Scan", icon: Radio },
   { to: "/predict", label: "Risk Prediction", icon: Target },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/historical", label: "Historical Events", icon: History },
   { to: "/simulation-archive", label: "Simulation Archive", icon: Archive },
-  { to: "/model", label: "ML Model", icon: BrainCircuit },
-  { to: "/map", label: "Locations / Map", icon: MapIcon },
   { to: "/locations", label: "Manage Locations", icon: MapPin },
   { to: "/alerts", label: "Alerts", icon: Bell },
-  { to: "/about", label: "About System", icon: Info },
 ];
 
 function SidebarBrand() {
@@ -173,6 +167,7 @@ export default function Layout({ children }) {
         <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-8">
           {children}
         </main>
+        <Footer className="border-t border-base-700/40" />
       </div>
     </div>
   );
