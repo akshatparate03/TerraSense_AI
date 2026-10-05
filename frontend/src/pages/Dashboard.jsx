@@ -261,11 +261,11 @@ export default function Dashboard() {
         {myPoints?.total > 0 && (
           <p className="mt-3 text-xs text-slate-500">
             {myPoints.total} location{myPoints.total === 1 ? "" : "s"} ·{" "}
-            <span className="text-rose-400">{myPoints.counts.HIGH || 0} high</span>
+            <span className="text-red-600">{myPoints.counts.HIGH || 0} high</span>
             {" · "}
-            <span className="text-amber-400">{myPoints.counts.MEDIUM || 0} medium</span>
+            <span className="text-yellow-600">{myPoints.counts.MEDIUM || 0} medium</span>
             {" · "}
-            <span className="text-emerald-400">{myPoints.counts.LOW || 0} low</span>
+            <span className="text-green-600">{myPoints.counts.LOW || 0} low</span>
             {" — latest result per location"}
           </p>
         )}

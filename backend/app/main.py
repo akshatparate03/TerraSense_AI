@@ -297,6 +297,28 @@ async def _run_monitoring_job():
         db.close()
 
 
+def _backfill_watchlist_flags():
+    try:
+        from scripts.seed_database import CURATED_LOCATIONS
+        from app.models.db_models import Location
+
+        names = [l["name"] for l in CURATED_LOCATIONS]
+        db = SessionLocal()
+        try:
+            n = (
+                db.query(Location)
+                .filter(Location.name.in_(names), Location.is_watchlist.is_(False))
+                .update({Location.is_watchlist: True}, synchronize_session=False)
+            )
+            db.commit()
+            if n:
+                logger.info(f"Re-flagged {n} curated locations as watchlist")
+        finally:
+            db.close()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Watchlist backfill skipped (non-fatal): {e}")
+
+
 @app.on_event("startup")
 async def _ensure_schema_additions():
     """Idempotent safety net for small additive schema changes that ship
@@ -325,6 +347,11 @@ async def _ensure_schema_additions():
             )
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Schema safety-net check skipped/failed (non-fatal): {e}")
+    # Databases created BEFORE the is_watchlist column existed have the curated
+    # scan locations flagged False, which made the Home page Live Risk Scan show
+    # an empty map / no results. Re-flag them by name (idempotent). Runs even if
+    # the ALTERs above were skipped.
+    _backfill_watchlist_flags()
 
 
 @app.on_event("startup")

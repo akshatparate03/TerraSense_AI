@@ -2,9 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Github,
-  Linkedin,
-  Mail,
   Satellite,
   CloudRain,
   Mountain,
@@ -28,13 +25,6 @@ import {
 import TerrainVisualization from "../components/TerrainVisualization.jsx";
 import Seo from "../components/Seo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-
-const TEAM = [
-  { name: "Team Member 1", role: "Project Lead / Backend & ML", photo: null },
-  { name: "Team Member 2", role: "Frontend & UI/UX", photo: null },
-  { name: "Team Member 3", role: "Data Engineering & Database", photo: null },
-  { name: "Team Member 4", role: "Documentation & Testing", photo: null },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Small shared primitives                                            */
@@ -794,61 +784,6 @@ export default function About() {
               desc="Turning complex Earth data into understandable maps, models, analytics and alerts."
             />
           </div>
-        </div>
-      </section>
-
-      {/* ================= PROJECT TEAM ================= */}
-      <section className="relative z-10 px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <SectionHeading
-            eyebrow="Project Team"
-            icon={Sparkles}
-            title="The People Behind TerraSense AI"
-            sub={null}
-          />
-          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {TEAM.map((member, i) => (
-              <FadeIn key={member.name} delay={i * 0.08}>
-                <motion.div
-                  whileHover={{ y: -8 }}
-                  className="glass group relative overflow-hidden rounded-2xl p-6 text-center transition-shadow hover:shadow-glow"
-                >
-                  <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent-cyan/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                  <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 border-accent-cyan/30 bg-base-800 text-xl font-bold text-accent-cyan transition-transform duration-300 group-hover:scale-105 group-hover:border-accent-cyan/60">
-                    {member.photo ? (
-                      <img
-                        src={member.photo}
-                        alt={member.name}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      member.name
-                        .split(" ")
-                        .map((w) => w[0])
-                        .slice(0, 2)
-                        .join("")
-                    )}
-                  </div>
-                  <p className="relative mt-4 text-sm font-semibold text-slate-100">
-                    {member.name}
-                  </p>
-                  <p className="relative text-xs text-slate-500">
-                    {member.role}
-                  </p>
-                  <div className="relative mt-3 flex justify-center gap-3 text-slate-600">
-                    <Github className="h-3.5 w-3.5 transition-colors group-hover:text-accent-cyan" />
-                    <Linkedin className="h-3.5 w-3.5 transition-colors group-hover:text-accent-cyan" />
-                    <Mail className="h-3.5 w-3.5 transition-colors group-hover:text-accent-cyan" />
-                  </div>
-                  <div className="relative mt-4 h-px w-0 bg-gradient-to-r from-accent-cyan to-accent-blue transition-all duration-500 group-hover:w-full" />
-                </motion.div>
-              </FadeIn>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-[11px] text-slate-600">
-            Placeholder photos and links — replace with real team member
-            details before submission/deployment.
-          </p>
         </div>
       </section>
 

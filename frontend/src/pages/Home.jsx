@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 import AnimatedBackground from "../components/AnimatedBackground.jsx";
 import TerrainVisualization from "../components/TerrainVisualization.jsx";
+import LandslideArt from "../components/LandslideArt.jsx";
 import LiveRiskScanSection from "../components/LiveRiskScanSection.jsx";
 import Footer from "../components/Footer.jsx";
 import Seo from "../components/Seo.jsx";
@@ -185,12 +186,39 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ---------------- LANDSLIDE GALLERY (decorative) ---------------- */}
+      <section className="relative z-10 px-6 pb-4 pt-8">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-accent-cyan/80">
+            Why early warning matters
+          </p>
+          <div className="mt-6 grid grid-cols-6 items-end gap-3 sm:gap-5">
+            <div className="col-span-3 sm:col-span-2">
+              <LandslideArt variant="slope" className="w-full border border-base-600 shadow-glow" />
+            </div>
+            <div className="col-span-3 sm:col-span-1">
+              <LandslideArt variant="rockfall" className="w-full border border-base-600 opacity-90" />
+            </div>
+            <div className="col-span-6 sm:col-span-2">
+              <LandslideArt variant="mudflow" className="w-full border border-base-600 shadow-glow" />
+            </div>
+            <div className="hidden sm:col-span-1 sm:block">
+              <LandslideArt variant="cracked" className="w-full border border-base-600 opacity-90" />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ---------------- 3D SHOWCASE ---------------- */}
       <section className="relative z-10 px-6 py-24">
         <div className="mx-auto max-w-5xl text-center">
-          <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
-            Worldwide Landslides — Last 12 Months
-          </h2>
+          <div className="flex items-center justify-center gap-6">
+            <LandslideArt variant="cracked" className="hidden w-28 border border-base-600 lg:block" />
+            <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
+              Worldwide Landslides — Last 12 Months
+            </h2>
+            <LandslideArt variant="rockfall" className="hidden w-28 border border-base-600 lg:block" />
+          </div>
           <p className="mx-auto mt-3 max-w-2xl text-slate-500">
             Every point is a reported landslide, placed on the terrain by its
             real location. Green = low impact, yellow = medium, red = high
@@ -228,15 +256,15 @@ export default function Home() {
           {landslides?.window_start && (
             <div className="mx-auto mt-4 max-w-2xl space-y-1 text-xs text-slate-500">
               <p>
-                <span className="font-semibold text-rose-400">
+                <span className="font-semibold text-red-600">
                   {landslides.counts.HIGH.toLocaleString()} high
                 </span>
                 {" · "}
-                <span className="font-semibold text-amber-400">
+                <span className="font-semibold text-yellow-600">
                   {landslides.counts.MEDIUM.toLocaleString()} medium
                 </span>
                 {" · "}
-                <span className="font-semibold text-emerald-400">
+                <span className="font-semibold text-green-600">
                   {landslides.counts.LOW.toLocaleString()} low
                 </span>
                 {" — "}
@@ -256,7 +284,9 @@ export default function Home() {
 
       {/* ---------------- CTA ---------------- */}
       <section className="relative z-10 px-6 py-24">
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto flex max-w-5xl items-center justify-center gap-8">
+          <LandslideArt variant="mudflow" className="hidden w-52 border border-base-600 opacity-90 md:block" />
+        <div className="max-w-3xl text-center">
           <h2 className="text-3xl font-bold text-slate-50 sm:text-4xl">
             {user ? "Ready to dive back in?" : "Ready to explore the platform?"}
           </h2>
@@ -274,6 +304,8 @@ export default function Home() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
+        </div>
+          <LandslideArt variant="slope" className="hidden w-52 border border-base-600 opacity-90 md:block" />
         </div>
       </section>
 

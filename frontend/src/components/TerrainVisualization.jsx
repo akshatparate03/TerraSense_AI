@@ -4,7 +4,9 @@ import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Maximize2, Minimize2, MousePointerClick } from "lucide-react";
 
-const RISK_COLOR = { LOW: "#34d399", MEDIUM: "#f59e0b", HIGH: "#f43f5e" };
+// Deep, saturated colours (dark green / dark yellow / dark red) so the dots
+// stand out clearly against the bluish terrain instead of looking washed out.
+const RISK_COLOR = { LOW: "#0f7a2e", MEDIUM: "#c28a00", HIGH: "#b3101c" };
 const TERRAIN_TILT = -Math.PI / 2.4;
 
 // Procedural conceptual terrain (layered sine noise) - NOT real elevation data.
@@ -70,7 +72,7 @@ function RiskHotspot({ position, level, name, showLabel }) {
         <meshStandardMaterial
           color={RISK_COLOR[level]}
           emissive={RISK_COLOR[level]}
-          emissiveIntensity={0.85}
+          emissiveIntensity={0.15}
         />
       </mesh>
       <mesh position={[0, -0.5, 0]}>
@@ -128,7 +130,7 @@ function PointCloud({ placed }) {
       frustumCulled={false}
     >
       <sphereGeometry args={[0.24, 12, 12]} />
-      <meshStandardMaterial emissive="#ffffff" emissiveIntensity={0.35} />
+      <meshStandardMaterial roughness={0.55} metalness={0.1} />
     </instancedMesh>
   );
 }
@@ -202,9 +204,9 @@ function Legend() {
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-3 rounded-lg border border-base-600 bg-base-900/80 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur">
       {[
-        ["#34d399", "Low"],
-        ["#f59e0b", "Medium"],
-        ["#f43f5e", "High"],
+        ["#0f7a2e", "Low"],
+        ["#c28a00", "Medium"],
+        ["#b3101c", "High"],
       ].map(([c, label]) => (
         <span key={label} className="flex items-center gap-1.5">
           <span

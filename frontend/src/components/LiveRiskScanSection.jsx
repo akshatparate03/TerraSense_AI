@@ -25,6 +25,20 @@ function riskColor(level) {
   return RISK_COLOR[level] || "#64748b";
 }
 
+function PendingRow({ loc }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-base-700/60 bg-base-800/20 px-4 py-3">
+      <div className="text-left">
+        <p className="text-sm font-medium text-slate-400">{loc.name}</p>
+        <p className="text-xs text-slate-600">{loc.country}</p>
+      </div>
+      <span className="flex items-center gap-1.5 text-xs text-accent-cyan/80">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...
+      </span>
+    </div>
+  );
+}
+
 function ResultRow({ r }) {
   const color = riskColor(r.risk_level);
   return (
@@ -85,6 +99,7 @@ export default function LiveRiskScanSection() {
   const [watchlist, setWatchlist] = useState(null);
   const [results, setResults] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
   const wsRef = useRef(null);
@@ -111,6 +126,7 @@ export default function LiveRiskScanSection() {
 
   const startScan = () => {
     setScanning(true);
+    setFinished(false);
     setError(null);
     setProgress(null);
     const partial = [];
@@ -138,11 +154,14 @@ export default function LiveRiskScanSection() {
       } else if (msg.type === "scan_complete") {
         setResults(msg.results);
         setScanning(false);
+        setFinished(true);
         ws.close();
       }
     };
     ws.onerror = () => {
-      setError("Live scan connection failed. Please try again in a moment.");
+      setError(
+        "Couldn't reach the live scan server. If the backend was idle it may need ~1 minute to wake up — please try again.",
+      );
       setScanning(false);
     };
     ws.onclose = () => setScanning(false);
@@ -249,20 +268,64 @@ export default function LiveRiskScanSection() {
             )}
           </Card>
 
-          <Card className="text-left">
+          <Card className="flex min-h-[520px] flex-col text-left">
             <SectionTitle title="Results — Highest Risk First" />
+
+            {/* idle: big centered call-to-action */}
             {!results && !scanning && (
-              <p className="flex items-center gap-2 text-sm text-slate-500">
-                <Globe2 className="h-4 w-4" /> Click "Start Live Scan" to check
-                current risk at every watchlist location.
-              </p>
+              <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-accent-cyan/30 bg-accent-cyan/5 shadow-glow">
+                  <Globe2 className="h-10 w-10 text-accent-cyan" />
+                </div>
+                <p className="text-2xl font-bold text-slate-100 sm:text-3xl">
+                  Click "Start Live Scan"
+                </p>
+                <p className="mt-3 max-w-sm text-base text-slate-400">
+                  to check the current landslide risk at every one of the{" "}
+                  {watchlist?.length ?? "..."} watchlist locations.
+                </p>
+              </div>
             )}
-            {results && (
-              <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-                {results.map((r) => (
+
+            {/* scanning / finished: rows appear as they arrive */}
+            {(results || scanning) && (
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: 400 }}>
+                {(results || []).map((r) => (
                   <ResultRow key={r.location_id} r={r} />
                 ))}
+                {scanning &&
+                  (watchlist || [])
+                    .filter((l) => !(results || []).some((r) => r.location_id === l.id))
+                    .map((l) => <PendingRow key={l.id} loc={l} />)}
+                {finished && (results || []).length === 0 && (
+                  <p className="py-10 text-center text-sm text-slate-500">
+                    The scan finished but no locations were available to check.
+                  </p>
+                )}
               </div>
+            )}
+
+            {scanning && (
+              <div className="mt-4 rounded-xl border border-accent-cyan/20 bg-accent-cyan/5 px-4 py-3">
+                <div className="flex items-center justify-center gap-2 text-sm font-medium text-accent-cyan">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching... {progress?.done ?? 0} of {progress?.total ?? "?"}{" "}
+                  locations checked
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-base-700">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-accent-cyan to-accent-blue transition-all duration-300"
+                    style={{
+                      width: `${progress?.total ? Math.round((progress.done / progress.total) * 100) : 5}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            {finished && !scanning && (results || []).length > 0 && (
+              <p className="mt-4 text-center text-xs text-slate-500">
+                Scan complete — {(results || []).length} locations checked.
+              </p>
             )}
           </Card>
         </div>
